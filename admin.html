@@ -265,6 +265,7 @@ let current = null;          // last status from the server
 let deviceList = null;       // filled once by /api/devices
 let restartPending = false;
 let linkLost = false;
+let qrUrl = null;            // the URL the QR on screen actually encodes
 const t = (key) => STR[lang][key];
 
 function applyTheme() {
@@ -300,6 +301,13 @@ function render() {
   $("detail").textContent = s.detail || "";
   $("listeners").textContent = s.listeners;
   $("url").textContent = s.url;
+  if (s.url && s.url !== qrUrl) {
+    qrUrl = s.url;
+    fetch("/qr.svg").then((r) => (r.ok ? r.text() : "")).then((svg) => {
+      $("qr").innerHTML = svg;                   // empty => segno isn't installed
+      $("qr").style.display = svg ? "grid" : "none";
+    });
+  }
 
   $("level").style.width = Math.min(100, s.level * 140) + "%";
   $("level").className = s.level > .92 ? "hot" : s.level < .02 ? "quiet" : "";

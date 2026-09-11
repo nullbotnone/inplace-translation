@@ -36,9 +36,14 @@ def trilingual(src, path):
 
 
 def ids_resolve(src, path):
+    """Both directions. A live id the script never touches is usually a dropped feature:
+    the element still renders, empty, and nothing errors."""
     ids = set(re.findall(r'\bid="([^"]+)"', src))
+    script = src[src.index('<script>'):]
     used = set(re.findall(r'\$\("([^"]+)"\)', src))
     assert not used - ids, f"{path}: JS looks up missing ids {sorted(used - ids)}"
+    orphans = {i for i in ids if f'"{i}"' not in script and f'#{i}' not in script}
+    assert not orphans, f"{path}: nothing in the script uses {sorted(orphans)}"
 
 
 def classes_defined(src, css, path, extra=()):
