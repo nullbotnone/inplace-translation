@@ -51,6 +51,7 @@ const sandbox = {
     addEventListener() {},
   },
   localStorage: { getItem: () => null, setItem() {} },
+  matchMedia: () => ({ matches: false }),          // OS prefers dark
   navigator: { language: "en-US" },
   fetch: () => new Promise(() => {}),          // never resolves: we drive state by hand
   EventSource: class {
@@ -99,6 +100,26 @@ try {
 if (optionWrites() !== before) {
   errors.push("a status update rewrote <option> text; that closes an open dropdown " +
               "and makes the selects unusable");
+}
+
+// every click on the theme button must change what is on screen
+const themeClick = byId.themebtn.onclick;
+if (typeof themeClick !== "function") {
+  errors.push("the theme button has no handler");
+} else {
+  // compare what the page LOOKS like, not the attribute: no attribute renders as the
+  // stylesheet's base theme, so "absent" and "dark" are the same picture
+  const osLight = sandbox.matchMedia().matches;
+  const appearance = () => sandbox.document.documentElement.dataset.theme
+    ?? (osLight ? "light" : "dark");
+  const seen = [appearance()];
+  for (let i = 0; i < 4; i++) { themeClick(); seen.push(appearance()); }
+  for (let i = 1; i < seen.length; i++) {
+    if (seen[i] === seen[i - 1]) {
+      errors.push(`theme click ${i} was a no-op: ${seen.join(" -> ")}`);
+      break;
+    }
+  }
 }
 
 if (errors.length) {

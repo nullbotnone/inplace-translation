@@ -320,10 +320,18 @@ const LANGNAME = {
   en: { en:"English", zh:"Chinese", auto:"auto-detect" },
 };
 
+/* "auto" is what the rest of slashai.app stores, but this page has no light default to
+   fall back on, so resolve it against the OS and always render an explicit theme.
+   Otherwise auto and dark look identical and every other click appears to do nothing. */
+function shown() {
+  if (theme !== "auto") return theme;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light" : "dark";
+}
+
 function applyTheme() {
-  if (theme === "auto") delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
-  $("themebtn").dataset.mode = theme;
+  document.documentElement.dataset.theme = shown();
+  $("themebtn").dataset.mode = shown();
 }
 
 /* Language-driven. Only ever called when the console language changes, because rewriting
@@ -424,7 +432,7 @@ $("langseg").onclick = (e) => {
   render();
 };
 $("themebtn").onclick = () => {
-  theme = theme === "auto" ? "light" : theme === "light" ? "dark" : "auto";
+  theme = shown() === "light" ? "dark" : "light";   // flip what is on screen, every time
   store.set("theme", theme);
   applyTheme();
 };
