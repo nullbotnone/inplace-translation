@@ -44,9 +44,30 @@ the HVAC, and the PA's own output, and Whisper transcribes all of it.
 
 ```bash
 brew install ffmpeg python@3.12
+cd ~                                    # not Documents, Desktop or Downloads — see below
+git clone https://github.com/nullbotnone/inplace-translation
+cd inplace-translation
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install speech-to-speech segno      # segno is optional, only for the QR code
 ```
+
+**Keep the project out of Documents, Desktop and Downloads.** macOS protects those three
+folders, and an app made of a shell script has no run loop, so it cannot even show the
+permission prompt — the read simply fails with *"Operation not permitted"*. Your home folder,
+or anywhere outside those three, works with no permissions at all. The app checks this on
+launch and explains it rather than showing the raw error.
+
+If it is already in the wrong place, move the folder and rebuild the environment, since a
+virtualenv hard-codes its own path:
+
+```bash
+mv ~/Documents/inplace-translation ~/inplace-translation && cd ~/inplace-translation
+rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate
+pip install speech-to-speech segno      # quick: pip still has the wheels cached
+```
+
+Granting the app Full Disk Access in System Settings → Privacy & Security works too, but
+moving the folder is less to explain to whoever runs it next.
 
 **Use Python 3.12, not whatever `python3` points at.** `misaki`, which Kokoro's text
 processing pulls in, publishes nothing for 3.13 or newer. On a 3.13+ venv pip cannot resolve

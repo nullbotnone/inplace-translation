@@ -7,8 +7,21 @@ console="http://127.0.0.1:8000/admin"
 say() { osascript -e "display dialog \"$1\" buttons {\"OK\"} default button 1 with title \"Sermon Translation\" with icon $2" >/dev/null 2>&1; }
 
 cd "$here" || exit 1
-if [ ! -x ./start.sh ]; then
+if [ ! -e ./start.sh ]; then
     say "Sermon Translation has to stay inside its project folder, next to start.sh. Move it back and try again." stop
+    exit 1
+fi
+
+# macOS refuses to let an app read Documents, Desktop or Downloads, and a script-based app
+# has no run loop, so it cannot even show the permission prompt: the read just fails. stat
+# still works, which is why this checks an actual read.
+if ! head -c 1 ./start.sh >/dev/null 2>&1; then
+    say "macOS does not let apps read files in Documents, Desktop or Downloads, and it cannot ask you about it for an app like this one.
+
+Move the project folder somewhere else - straight into your home folder works - then open the app from there.
+
+Or add Sermon Translation to Full Disk Access in the window that is about to open, and try again." stop
+    open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
     exit 1
 fi
 

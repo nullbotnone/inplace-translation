@@ -12,6 +12,15 @@
     <key>CFBundleShortVersionString</key>    <string>1.0</string>
     <key>LSMinimumSystemVersion</key>        <string>13.0</string>
 
+    <!-- Without these, macOS denies the folder silently instead of asking. The project
+         usually sits in Documents or on the Desktop, both of which are protected. -->
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Sermon Translation needs to read its own project folder, which is in your Documents.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Sermon Translation needs to read its own project folder, which is on your Desktop.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Sermon Translation needs to read its own project folder, which is in your Downloads.</string>
+
     <!-- The mic prompt is attributed to this bundle, so this is the sentence the
          volunteer reads when macOS asks. -->
     <key>NSMicrophoneUsageDescription</key>
