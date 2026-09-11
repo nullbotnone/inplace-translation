@@ -1,0 +1,32 @@
+Copy this to glossary.txt and replace the placeholders with your own. Every line here is
+appended to the translator's prompt on every single utterance, so it costs latency: keep it
+to the terms your congregation would notice getting wrong, not a dictionary. Thirty lines is
+plenty; two hundred will slow the translation down measurably.
+
+House style for this congregation:
+
+Quote scripture in 和合本 wording, and use its Chinese book names. Keep chapter and verse
+in digits: "John 3:16" -> "约翰福音 3:16".
+
+Render these terms consistently:
+  fellowship -> 团契 (never 友谊)
+  small group / cell group -> 小组
+  Sunday service -> 主日崇拜
+  worship -> 敬拜
+  communion / the Lord's Supper -> 圣餐
+  baptism -> 洗礼
+  testimony -> 见证
+  offering -> 奉献; tithe -> 十一奉献
+  repentance -> 悔改
+  grace -> 恩典
+  sanctification -> 成圣
+  the Holy Spirit -> 圣灵
+  Gentiles -> 外邦人
+  stewardship -> 管家的职分
+  elder -> 长老; deacon -> 执事
+
+Names, always in this form:
+  Pastor John Smith -> 史约翰牧师
+  Elder Mary Chen -> 陈美丽长老
+  Grace Community Church -> 恩典社区教会
+  the Joshua Fellowship -> 约书亚团契

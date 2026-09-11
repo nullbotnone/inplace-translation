@@ -119,8 +119,11 @@ Four things to get right on a Mac that nobody logs into on Sunday morning:
 ## Tuning that actually matters
 
 - **`glossary.txt`** — if present, its contents are appended to the translator prompt. Put
-  your church's names in it: 长老 / elder names, ministry names, the Bible translation you
-  quote (和合本 vs 新译本 wording). This is the single biggest quality win and costs nothing.
+  your church's names in it, your ministry names, and the Bible translation you quote (和合本
+  vs 新译本 wording). This is the single biggest quality win available to you:
+  `cp glossary.example.txt glossary.txt` and edit. It is gitignored, since it ends up full of
+  real people's names. Keep it short — it is re-read on every utterance, so a long one costs
+  latency on every sentence of the sermon.
 - **LLM size** — a 4B model is the floor for sermon register. On a 24 GB+ Mac use
   `mlx-community/Qwen3-8B-Instruct-4bit`; translation quality scales visibly. Watch the
   backlog warnings after you switch — a bigger model is also a slower one.
