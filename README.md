@@ -77,7 +77,9 @@ broadcast, and prints the listener URL and a QR code. Then open the console:
 
 **http://localhost:8000/admin**
 
-The console is where everything gets configured, so you should not need this README again:
+The console is where everything gets configured, so you should not need this README again.
+It reads 简 / 繁 / EN and has a day/night toggle in the corner, both remembered between
+sessions:
 
 - **Microphone** — pick the input from a list, and watch the level meter while someone talks
   into it. This is the failure everyone hits, and the meter turns it into a five-second check
@@ -162,7 +164,7 @@ All of this lives in the console; the notes below are why each one is there.
 ```bash
 python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out,
                          # config persistence, and that the console refuses the LAN
-python3 docs/check_page.py
+python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids
 ```
 
 The pipeline itself has no self-check here: start it and read `sermon.log`, where every
