@@ -119,6 +119,16 @@ head = page[:page.index('</head>')]
 for dep in ('href="/styles.css"', 'href="/favicon.svg"'):
     assert dep not in head, f"docs/index.html is not self-contained: {dep}"
 
+# ---- the theme button must flip what is on screen. Deleting the attribute falls back to
+# the stylesheet's base theme, which makes "auto" and "dark" the same picture and turns one
+# click in three into a no-op. This drifted between the two pages once already.
+for name, text in (("admin.html", admin), ("docs/index.html", page)):
+    if "themebtn" not in text:
+        continue
+    assert "delete document.documentElement.dataset.theme" not in text, \
+        f"{name}: theme toggle leaves the attribute unset, so a click can paint nothing"
+    assert "prefers-color-scheme" in text, f"{name}: nothing resolves the auto theme"
+
 # static checks cannot see a runtime error; run the script if node is available
 import shutil, subprocess
 if shutil.which("node"):

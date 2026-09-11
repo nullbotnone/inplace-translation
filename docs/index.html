@@ -396,19 +396,27 @@ hf cache prune                 <span class="c"># half-finished downloads</span><
     });
   }
 
+  /* This page has no prefers-color-scheme rules, so "auto" paints exactly like "dark".
+     Resolve it against the OS and always write an explicit theme, otherwise one click in
+     three changes nothing and the button feels broken. */
+  function shown() {
+    if (theme !== "auto") return theme;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
+      ? "light" : "dark";
+  }
+
   function applyTheme() {
-    if (theme === "auto") delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.theme = shown();
     document.querySelector('meta[name="theme-color"]').content =
-      theme === "light" ? "#f1eadb" : "#071013";
-    document.getElementById("themebtn").dataset.mode = theme;
+      shown() === "light" ? "#f1eadb" : "#071013";
+    document.getElementById("themebtn").dataset.mode = shown();
   }
 
   document.addEventListener("click", (event) => {
     const btn = event.target.closest("#langseg button");
     if (btn) { lang = btn.dataset.lang; store.set("lang", lang); applyLang(); return; }
     if (event.target.closest("#themebtn")) {
-      theme = theme === "auto" ? "light" : theme === "light" ? "dark" : "auto";
+      theme = shown() === "light" ? "dark" : "light";   // flip what is on screen, every time
       store.set("theme", theme);
       applyTheme();
     }
