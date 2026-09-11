@@ -73,7 +73,6 @@
   @media (max-width:46rem){.cards{grid-template-columns:1fr}}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
         padding:1.2rem;display:flex;flex-direction:column}
-  .card.wide{grid-column:1/-1}
   label{display:block;margin-bottom:1rem}
   .card > label:last-of-type{margin-bottom:.6rem}
   .card .hint:last-child{margin-top:auto;padding-top:.6rem}
@@ -100,7 +99,7 @@
   .url{margin:.7rem 0 0;text-align:center;font:.85rem/1.5 var(--mono);word-break:break-all;
        color:var(--accent)}
 
-  #log{margin:0;padding:0;list-style:none;height:16rem;overflow-y:auto}
+  #log{margin:0;padding:0;list-style:none;flex:1;min-height:12rem;overflow-y:auto}
   #log li{padding:.5rem 0;border-bottom:1px solid var(--line)}
   #log li:last-child{border-bottom:0}
   #log .t{color:var(--dim);font:.7rem/1 var(--mono);letter-spacing:.08em}
@@ -239,7 +238,7 @@
     </div>
   </div>
 
-  <div class="card wide">
+  <div class="card">
     <h2 data-zh="实时字幕" data-tw="即時字幕" data-en="Live transcript"></h2>
     <ul id="log"><li class="empty" data-zh="还没有内容。" data-tw="還沒有內容。"
                      data-en="Nothing yet."></li></ul>
