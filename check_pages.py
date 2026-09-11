@@ -27,6 +27,27 @@ def balanced(src, path):
     assert not p.stack, f"{path}: never closed {p.stack}"
 
 
+def no_children_under_translation(src, path):
+    """textContent on a node with children deletes them. Catching this statically because
+    the page still renders: the label appears, the controls it replaced just vanish."""
+    class P(html.parser.HTMLParser):
+        def __init__(s): super().__init__(); s.depth = None; s.bad = []; s.stack = []
+        def handle_starttag(s, tag, attrs):
+            translated = any(k == "data-en" for k, _ in attrs)
+            if s.depth is not None and tag not in VOID:
+                s.bad.append(f"<{s.stack[s.depth]}> carries data-en but contains <{tag}>")
+            if tag in VOID: return
+            s.stack.append(tag)
+            if translated and s.depth is None: s.depth = len(s.stack) - 1
+        def handle_endtag(s, tag):
+            if tag in VOID: return
+            if s.stack:
+                if s.depth == len(s.stack) - 1: s.depth = None
+                s.stack.pop()
+    p = P(); p.feed(src)
+    assert not p.bad, f"{path}: {p.bad}"
+
+
 def trilingual(src, path):
     for m in re.finditer(r'<[^>]*\bdata-en=', src):
         tag = src[m.start():src.index('>', m.start()) + 1]
@@ -71,6 +92,7 @@ admin = (HERE / "admin.html").read_text()
 balanced(admin, "admin.html")
 ids_resolve(admin, "admin.html")
 n_admin = trilingual(admin, "admin.html")
+no_children_under_translation(admin, "admin.html")
 n_tokens = themed(admin, "admin.html")
 # every runtime string exists in all three languages, and every t() key exists
 blocks = {l: re.search(rf'\n  {l}: \{{(.*?)\n  }},', admin, re.S).group(1) for l in LANGS}
@@ -91,6 +113,7 @@ page = (HERE / "docs" / "index.html").read_text()
 css = (HERE / "docs" / "styles.css").read_text()
 balanced(page, "docs/index.html")
 n_page = trilingual(page, "docs/index.html")
+no_children_under_translation(page, "docs/index.html")
 classes_defined(page, css, "docs/index.html", extra=("bx", "tx", "sb", "ln", "zone", "c"))
 head = page[:page.index('</head>')]
 for dep in ('href="/styles.css"', 'href="/favicon.svg"'):

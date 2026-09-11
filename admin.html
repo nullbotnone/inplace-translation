@@ -113,8 +113,10 @@
   <h1 data-zh="讲道翻译控制台" data-tw="講道翻譯控制台" data-en="Sermon Translation"></h1>
   <span class="state" id="state" data-s="stopped"><i></i><span id="statetext"></span></span>
   <span class="grow"></span>
-  <div class="seg" role="group" id="langseg"
-       data-zh="控制台语言" data-tw="控制台語言" data-en="Console language">
+  <!-- No data-* translation on this element: labels() writes textContent, which would
+       replace these buttons with the label text. The sermon's languages are named in
+       their own card, so a static aria-label is enough to tell the two apart. -->
+  <div class="seg" role="group" id="langseg" aria-label="Console language">
     <button type="button" data-lang="zh">简</button>
     <button type="button" data-lang="tw">繁</button>
     <button type="button" data-lang="en">EN</button>
