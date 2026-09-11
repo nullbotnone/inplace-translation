@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sermon Translation · 讲道翻译</title>
+<meta name="description" content="Live English↔Chinese sermon translation on your church wifi. Runs entirely on one Mac. No app, no cloud, no audio leaves the building.">
+<style>
+  :root{--bg:#0d0f13;--card:#151922;--line:#252b38;--fg:#e8eaef;--dim:#9aa3b2;--accent:#5b8dfa}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:16px/1.7 ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",sans-serif}
+  .wrap{max-width:760px;margin:0 auto;padding:0 1.5rem}
+  h1{font-size:clamp(2rem,6vw,3rem);line-height:1.15;margin:0 0 .5rem;letter-spacing:-.02em}
+  h2{font-size:1.35rem;margin:3.5rem 0 1rem;letter-spacing:-.01em}
+  h2 span{color:var(--dim);font-weight:400;font-size:1rem;margin-left:.5rem}
+  header{padding:5rem 0 1rem;border-bottom:1px solid var(--line)}
+  .lede{font-size:1.2rem;color:var(--dim);max-width:34rem}
+  .zh{color:var(--dim);font-size:1.1rem;margin-top:-.2rem}
+  .pills{display:flex;flex-wrap:wrap;gap:.5rem;margin:2rem 0 3rem}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:.3rem .9rem;
+        font-size:.85rem;color:var(--dim)}
+  a{color:var(--accent)}
+  .cta{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;
+       padding:.8rem 1.6rem;border-radius:8px;font-weight:600}
+  .cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem}
+  .card h3{margin:0 0 .4rem;font-size:1rem}
+  .card p{margin:0;color:var(--dim);font-size:.92rem;line-height:1.6}
+  pre{background:var(--card);border:1px solid var(--line);border-radius:10px;
+      padding:1.1rem;overflow-x:auto;font-size:.86rem;line-height:1.7}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  p code{background:var(--card);padding:.1em .4em;border-radius:4px;font-size:.88em}
+  svg{width:100%;height:auto;margin:1rem 0}
+  ul{padding-left:1.1rem;color:var(--dim)}
+  li{margin:.6rem 0}
+  li b{color:var(--fg);font-weight:600}
+  footer{margin:5rem 0 3rem;padding-top:2rem;border-top:1px solid var(--line);
+         color:var(--dim);font-size:.9rem}
+  table{width:100%;border-collapse:collapse;font-size:.92rem}
+  td{padding:.6rem 0;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top}
+  td:first-child{color:var(--fg);width:38%;padding-right:1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Sermon translation<br>on your church wifi</h1>
+  <p class="zh">讲道即时翻译 · 英文 ↔ 中文</p>
+  <p class="lede">A visitor scans a QR code and hears the sermon in their own language,
+     with subtitles. It runs on one Mac in the back of the room. Nothing is sent anywhere.</p>
+  <div class="pills">
+    <span class="pill">English ↔ 中文</span>
+    <span class="pill">No app to install</span>
+    <span class="pill">No cloud, no API keys</span>
+    <span class="pill">~300 lines of Python</span>
+  </div>
+  <a class="cta" href="https://github.com/nullbotnone/inplace-translation">View on GitHub →</a>
+</header>
+
+<h2>How it works <span>工作原理</span></h2>
+<p>A Mac takes a feed from the sound desk. Voice activity detection splits the preacher into
+   sentences, Whisper transcribes each one, a local language model translates it, and a local
+   voice speaks the result. That audio is re-broadcast over the wifi as an ordinary MP3 stream
+   that any phone browser can play, and the transcripts go out alongside it as live subtitles.</p>
+
+<svg viewBox="0 0 700 190" role="img" aria-label="Audio from the sound desk goes through voice detection, speech recognition, translation and speech synthesis on one Mac, then out to phones as an MP3 stream and subtitles.">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 z" fill="#5b8dfa"/>
+    </marker>
+    <style>
+      .b{fill:#151922;stroke:#252b38;rx:8}
+      .t{fill:#e8eaef;font:13px ui-sans-serif,system-ui;text-anchor:middle}
+      .s{fill:#9aa3b2;font:11px ui-sans-serif,system-ui;text-anchor:middle}
+      .l{stroke:#5b8dfa;stroke-width:1.6;fill:none;marker-end:url(#a)}
+      .box{fill:none;stroke:#252b38;stroke-dasharray:4 4;rx:10}
+    </style>
+  </defs>
+
+  <rect class="box" x="112" y="8" width="336" height="104"/>
+  <text class="s" x="280" y="26">one Mac · nothing leaves the building</text>
+
+  <rect class="b" x="8" y="52" width="92" height="44"/>
+  <text class="t" x="54" y="72">sound desk</text><text class="s" x="54" y="88">line in</text>
+
+  <rect class="b" x="128" y="44" width="72" height="58"/>
+  <text class="t" x="164" y="68">VAD</text><text class="s" x="164" y="85">sentences</text>
+
+  <rect class="b" x="214" y="44" width="72" height="58"/>
+  <text class="t" x="250" y="68">Whisper</text><text class="s" x="250" y="85">transcribe</text>
+
+  <rect class="b" x="300" y="44" width="72" height="58"/>
+  <text class="t" x="336" y="68">Qwen</text><text class="s" x="336" y="85">translate</text>
+
+  <rect class="b" x="386" y="44" width="48" height="58"/>
+  <text class="t" x="410" y="68">TTS</text><text class="s" x="410" y="85">voice</text>
+
+  <rect class="b" x="500" y="20" width="96" height="44"/>
+  <text class="t" x="548" y="40">MP3 stream</text><text class="s" x="548" y="56">/stream.mp3</text>
+
+  <rect class="b" x="500" y="84" width="96" height="44"/>
+  <text class="t" x="548" y="104">subtitles</text><text class="s" x="548" y="120">/subs</text>
+
+  <rect class="b" x="628" y="52" width="64" height="44"/>
+  <text class="t" x="660" y="72">phones</text><text class="s" x="660" y="88">QR code</text>
+
+  <path class="l" d="M100,74 H124"/>
+  <path class="l" d="M200,73 H210"/>
+  <path class="l" d="M286,73 H296"/>
+  <path class="l" d="M372,73 H382"/>
+  <path class="l" d="M434,73 H468 V42 H496"/>
+  <path class="l" d="M434,73 H468 V106 H496"/>
+  <path class="l" d="M596,42 H612 V70 H624"/>
+  <path class="l" d="M596,106 H612 V78 H624"/>
+</svg>
+
+<h2>Why it's built this way <span>设计取舍</span></h2>
+<div class="cards">
+  <div class="card">
+    <h3>No app, no accounts</h3>
+    <p>Listeners scan a QR code and press play. It is a web page and an
+       <code>&lt;audio&gt;</code> tag, so it works on whatever phone a visitor walks in with.</p>
+  </div>
+  <div class="card">
+    <h3>Audio never leaves</h3>
+    <p>Speech recognition, translation and the synthesised voice all run on the Mac.
+       No API keys, no per-minute billing, and no recording of your congregation on
+       someone else's server.</p>
+  </div>
+  <div class="card">
+    <h3>Subtitles as well as voice</h3>
+    <p>The same pipeline produces text, so the page shows live subtitles. Useful for deaf
+       members, and for anyone who reads a language faster than they hear it.</p>
+  </div>
+  <div class="card">
+    <h3>A glossary you control</h3>
+    <p>One plain-text file pins your ministry names, your elders' names, and the Bible
+       translation you quote. It is the cheapest quality improvement available.</p>
+  </div>
+</div>
+
+<h2>Setting it up <span>安装</span></h2>
+<p>You need an Apple Silicon Mac with 16&nbsp;GB of memory, and a USB audio interface taking a
+   feed from the sound desk. Budget about fifteen minutes and 8&nbsp;GB of model downloads.</p>
+<pre><code>git clone https://github.com/nullbotnone/inplace-translation
+cd inplace-translation
+python3 -m venv .venv && source .venv/bin/activate
+pip install speech-to-speech segno && brew install ffmpeg
+
+./start.sh          # prints the QR code to put on your bulletin</code></pre>
+<p>There is a <code>launchd</code> agent in the repo so it comes up on its own and a volunteer
+   never has to open a terminal on Sunday morning.</p>
+
+<h2>What it is not <span>限制</span></h2>
+<p>This matters more than the feature list. Be straight with your congregation about it.</p>
+<ul>
+  <li><b>It runs three to eight seconds behind the preacher.</b> Nothing is translated until
+      a sentence ends, and then recognition, translation, speech synthesis and the phone's
+      own buffer all add up. Fine for preaching. Useless for question and answer.</li>
+  <li><b>It will mistranslate.</b> A model small enough to run on a laptop gets theology wrong
+      in interesting ways. Treat it as help for a visitor who would otherwise understand
+      nothing, not as the sermon of record.</li>
+  <li><b>A preacher who never pauses will drift.</b> Synthesised speech takes about as long as
+      the original, so there is no slack to catch up. The stream resyncs to live rather than
+      falling further behind.</li>
+  <li><b>It does not replace a human interpreter.</b> If you have one, keep them.</li>
+</ul>
+
+<h2>Under the hood <span>技术细节</span></h2>
+<table>
+  <tr><td>Pipeline</td><td><a href="https://github.com/huggingface/speech-to-speech">huggingface/speech-to-speech</a>, with the assistant prompt replaced by a translator prompt</td></tr>
+  <tr><td>Speech recognition</td><td>Whisper via MLX</td></tr>
+  <tr><td>Translation</td><td>Qwen3 4B or 8B, quantised, running locally</td></tr>
+  <tr><td>Voice</td><td>Qwen3-TTS, or Kokoro when you need more speed</td></tr>
+  <tr><td>Broadcast</td><td>ffmpeg to MP3, fanned out by Python's standard-library HTTP server</td></tr>
+  <tr><td>Subtitles</td><td>Server-sent events on the same connection budget</td></tr>
+  <tr><td>Licence</td><td>Apache 2.0, same as the pipeline it builds on</td></tr>
+</table>
+
+<footer>
+  Built for a church that needed it. If you run it somewhere, or it breaks in a way the
+  README does not cover, open an issue on
+  <a href="https://github.com/nullbotnone/inplace-translation">GitHub</a>.
+</footer>
+
+</div>
+</body>
+</html>
