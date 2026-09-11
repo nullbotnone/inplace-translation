@@ -152,10 +152,7 @@
     <label>
       <span data-zh="听众听到的语言" data-tw="聽眾聽到的語言" data-en="Listeners hear"></span>
       <select id="target">
-        <option value="zh-Hans" data-zh="简体中文" data-tw="簡體中文"
-                data-en="Chinese — Simplified 简体"></option>
-        <option value="zh-Hant" data-zh="繁体中文" data-tw="繁體中文"
-                data-en="Chinese — Traditional 繁體"></option>
+        <option value="zh" data-zh="中文" data-tw="中文" data-en="Chinese"></option>
         <option value="en" data-zh="英文" data-tw="英文" data-en="English"></option>
       </select>
     </label>
@@ -310,10 +307,9 @@ const PLACEHOLDER = {
 };
 
 const LANGNAME = {
-  zh: { en:"英文", zh:"中文", auto:"自动判断", "zh-Hans":"简体中文", "zh-Hant":"繁体中文" },
-  tw: { en:"英文", zh:"中文", auto:"自動判斷", "zh-Hans":"簡體中文", "zh-Hant":"繁體中文" },
-  en: { en:"English", zh:"Chinese", auto:"auto-detect", "zh-Hans":"Simplified Chinese",
-        "zh-Hant":"Traditional Chinese" },
+  zh: { en:"英文", zh:"中文", auto:"自动判断" },
+  tw: { en:"英文", zh:"中文", auto:"自動判斷" },
+  en: { en:"English", zh:"Chinese", auto:"auto-detect" },
 };
 
 function applyTheme() {
@@ -352,8 +348,7 @@ function paint() {
   if (!s) return;
 
   const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
-  const same = s.config.source === "en" ? s.config.target === "en"
-             : s.config.source === "zh" ? s.config.target.startsWith("zh") : false;
+  const same = s.config.source === s.config.target;
   $("langhint").textContent = same ? t("samelang")
     : t("direction").replace("{a}", from).replace("{b}", into);
   $("langhint").className = "hint" + (same ? " warn" : "");

@@ -10,6 +10,10 @@
 
 House style for this congregation:
 
+# Subtitles follow whatever you ask for here. Uncomment the next line if your congregation
+# reads Traditional characters — it makes no difference to the spoken translation.
+# Write all Chinese in Traditional characters (繁體), not Simplified.
+
 Quote scripture in 和合本 wording, and use its Chinese book names. Keep chapter and verse
 in digits: "John 3:16" -> "约翰福音 3:16".
 

@@ -87,6 +87,9 @@ sessions:
   only rewrites the prompt, so it takes effect on the next sentence. Pick **Detect
   automatically** only if the preacher genuinely switches mid-sermon — naming the language
   outright gets better recognition on names and short phrases.
+  There is no 简体/繁體 choice, because listeners are hearing audio and the distinction only
+  exists in writing. It shows up in the subtitles, so a congregation that reads Traditional
+  asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*
 - **Microphone** — pick the input from a list, and watch the level meter while someone talks
   into it. This is the failure everyone hits, and the meter turns it into a five-second check
   instead of a mystery. Switching device takes effect immediately.

@@ -66,13 +66,17 @@ for _ in range(20):
 assert len(bridge.recent) == 8, "backlog not capped"
 
 # the prompt names the actual direction, so the model is not left guessing
-en2zh = {**bridge.DEFAULTS, "source": "en", "target": "zh-Hans"}
+en2zh = {**bridge.DEFAULTS, "source": "en", "target": "zh"}
 zh2en = {**bridge.DEFAULTS, "source": "zh", "target": "en"}
 assert "talking in English" in bridge.instructions(en2zh)
-assert "into Simplified Chinese (简体)" in bridge.instructions(en2zh)
+assert "into Chinese" in bridge.instructions(en2zh)
 assert "talking in Chinese" in bridge.instructions(zh2en)
 assert "into English" in bridge.instructions(zh2en)
-assert "Traditional" in bridge.instructions({**en2zh, "target": "zh-Hant"})
+# 简体/繁體 is a written distinction listeners cannot hear, so it is not a target;
+# a church that reads Traditional asks for it in the glossary, which still reaches the prompt
+bridge.GLOSSARY_PATH.write_text("Write all Chinese in Traditional characters (繁體).")
+assert "繁體" in bridge.instructions(en2zh)
+bridge.GLOSSARY_PATH.unlink()
 
 # the glossary is read fresh each time, so edits apply without a restart
 assert "Grace Chapel" not in bridge.instructions(en2zh)
@@ -107,17 +111,22 @@ assert p0._command()[p0._command().index("--language") + 1] == "auto"
 # junk never reaches a CLI flag or a dict lookup
 p1 = bridge.Pipeline()
 for bad in ({"source": "klingon"}, {"target": "zh-Hanzi"}, {"tts": "; rm -rf /"},
-            {"chat_size": 99}, {"chat_size": "two"}, {"chat_size": True},
+            {"target": "zh-Hans"}, {"chat_size": 99}, {"chat_size": "two"}, {"chat_size": True},
             {"min_silence_ms": -1}, {"device": "webcam"}, {"model": ""}):
     assert p1.update(bad) is False and p1.cfg == bridge.DEFAULTS, f"accepted {bad}"
 assert p1.update({"source": "auto"}) is True, "spoken language should need a restart"
-assert p1.update({"target": "zh-Hant"}) is False, "target only changes the prompt"
+assert p1.update({"target": "en"}) is False, "target only changes the prompt"
 
 # a hand-edited config.json with a bad value falls back instead of crashing at startup
 bridge.CONFIG_PATH.write_text(json.dumps({"source": "klingon", "target": "en", "chat_size": 3}))
 loaded = bridge.load_config()
 assert loaded["source"] == bridge.DEFAULTS["source"], "bad value survived load"
 assert loaded["target"] == "en" and loaded["chat_size"] == 3, "good values were dropped"
+
+# a config written before 简体/繁體 was dropped still starts, quietly, on the same language
+for legacy in ("zh-Hans", "zh-Hant"):
+    bridge.CONFIG_PATH.write_text(json.dumps({"target": legacy}))
+    assert bridge.load_config()["target"] == "zh", f"{legacy} did not migrate"
 
 # config: only known keys, persisted, and only model-ish changes demand a restart
 p = bridge.Pipeline()

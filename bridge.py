@@ -23,7 +23,7 @@ GLOSSARY_PATH = HERE / "glossary.txt"
 DEFAULTS = {
     "device": None,                                              # mic; None = system default
     "source": "en",                                              # what the preacher speaks
-    "target": "zh-Hans",                                         # what listeners hear
+    "target": "zh",                                              # what listeners hear
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
     "stt": "mlx-audio-whisper",
     "tts": "qwen3",
@@ -35,8 +35,10 @@ NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source"}
 # change the prompt. "source" sets the recognition language, which is a CLI flag.
 
 SPOKEN = {"en": "English", "zh": "Chinese", "auto": "whatever language the speaker uses"}
-TARGETS = {"en": "English", "zh-Hans": "Simplified Chinese (简体)",
-           "zh-Hant": "Traditional Chinese (繁體)"}
+TARGETS = {"en": "English", "zh": "Chinese"}
+# Listeners hear audio, where 简体 vs 繁體 does not exist. It only shows up in the
+# subtitles, so a church that wants Traditional asks for it in the glossary instead.
+LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
 STT_LANG = {"en": "en", "zh": "zh", "auto": "auto"}
 
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
@@ -69,6 +71,7 @@ def load_config():
     cfg = dict(DEFAULTS)
     if CONFIG_PATH.exists():
         saved = json.loads(CONFIG_PATH.read_text())
+        saved["target"] = LEGACY_TARGET.get(saved.get("target"), saved.get("target"))
         for key, value in saved.items():
             if key in DEFAULTS and valid(key, value):
                 cfg[key] = value
