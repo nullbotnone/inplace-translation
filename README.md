@@ -31,7 +31,7 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 |---|---|
 | Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Qwen3-TTS is ~7.5 GB of weights, plus caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
-| Disk | ~15 GB for weights and dependencies |
+| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv |
 
 Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
 MLX inference; on battery the Mac throttles and the translation falls behind.
@@ -166,8 +166,8 @@ Four things to get right on a Mac that nobody logs into on Sunday morning:
   login, so a Mac sitting at the login screen is running nothing.
 - **Stop it sleeping** (System Settings → Lock Screen → never; Displays → prevent sleep when
   the display is off). `caffeinate -i` covers idle sleep, not a scheduled or lid-close sleep.
-- **It stays loaded between services.** `KeepAlive` holds ~8 GB resident all week so Sunday
-  needs no warm-up. If that Mac has other jobs, drop `KeepAlive` and `RunAtLoad` and start it
+- **It stays loaded between services.** `KeepAlive` keeps the models in memory all week so
+  Sunday needs no warm-up. If that Mac has other jobs, drop `KeepAlive` and `RunAtLoad` and start it
   with `launchctl kickstart` instead.
 
 ## Tuning that actually matters
@@ -237,10 +237,10 @@ downloads them again and the console sits on "starting" until it finishes.
 ## Self-check
 
 ```bash
-python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out,
-                         # config persistence, and that the console refuses the LAN
-python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids,
-                         # and the console script actually runs (needs node)
+python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out, config
+                         # validation, clean shutdown on TERM/HUP, console refuses the LAN
+python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids, the
+                         # theme toggle always flips, and the console script runs (needs node)
 ```
 
 The pipeline itself has no self-check here: start it and read `sermon.log`, where every

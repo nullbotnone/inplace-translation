@@ -16,7 +16,7 @@ S2S_PORT, HTTP_PORT = 8765, 8000
 RATE, BLOCK = 16000, 320          # 20 ms of s16le mono
 MAX_LAG_S = 20                    # translation backlog before we start dropping
 MAX_QUEUED = 60                   # mp3 chunks buffered per listener (~10 s) before eviction
-LOAD_TIMEOUT_S = 900              # first run downloads ~8 GB before the port answers
+LOAD_TIMEOUT_S = 900              # first run downloads ~6.6 GB before the port answers
 
 CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
@@ -206,7 +206,7 @@ class Pipeline:
         try:
             if not port_open(S2S_PORT):
                 self.proc = subprocess.Popen(self._command(), cwd=HERE)
-                self._set("starting", "loading models (first run downloads ~8 GB)")
+                self._set("starting", "loading models (first run downloads ~6.6 GB)")
                 deadline = time.monotonic() + LOAD_TIMEOUT_S
                 while not port_open(S2S_PORT):
                     if self.proc.poll() is not None:

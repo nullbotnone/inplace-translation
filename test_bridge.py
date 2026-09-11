@@ -176,8 +176,9 @@ assert Stub("::1").local_only() is True
 blocked = Stub("192.168.1.40")
 assert blocked.local_only() is False and blocked.err == 403, "console exposed to the LAN"
 
-# SIGTERM must run the cleanup, not kill the interpreter where it stands. launchd and the
-# app bundle both send it, and without this ffmpeg and the pipeline are orphaned.
+# A termination signal must run the cleanup, not kill the interpreter where it stands.
+# launchd sends TERM and closing the Terminal window sends HUP; without a handler for
+# both, ffmpeg and the pipeline are orphaned.
 import os, subprocess, sys
 here = Path(__file__).parent
 proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start"],

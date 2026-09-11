@@ -138,5 +138,9 @@ if shutil.which("node"):
 else:
     print("note: node not found, skipped the console runtime check")
 
+# the served copy and the site's copy are the same mark; nothing keeps them in step but this
+assert (HERE / "favicon.svg").read_bytes() == (HERE / "docs" / "favicon.svg").read_bytes(), \
+    "favicon.svg and docs/favicon.svg have drifted apart"
+
 print(f"ok: console {n_admin} labels + {len(keys['en'])} runtime strings x3 langs, "
       f"{n_tokens} themed tokens; landing page {n_page} labels")
