@@ -79,7 +79,10 @@ def load_config():
 
 def instructions(cfg):
     """Rebuilt on every session.update, so glossary and target edits apply without a restart."""
-    glossary = GLOSSARY_PATH.read_text().strip() if GLOSSARY_PATH.exists() else ""
+    raw = GLOSSARY_PATH.read_text() if GLOSSARY_PATH.exists() else ""
+    # '#' lines are notes to whoever maintains the file. They must not reach the model, which
+    # would otherwise read "copy this to glossary.txt" as part of its instructions.
+    glossary = "\n".join(l for l in raw.splitlines() if not l.lstrip().startswith("#")).strip()
     return base_prompt(cfg) + ("\n" + glossary if glossary else "")
 
 
@@ -401,6 +404,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.local_only():
                 self.stream(events, "text/event-stream",
                             [("status", pipeline.status())] + [("line", l) for l in list(recent)])
+        elif path == "/api/glossary/example":
+            if self.local_only():
+                self.send_file("glossary.example.txt", "text/plain; charset=utf-8")
         elif path == "/api/devices":
             if self.local_only():
                 self.send_json(devices())

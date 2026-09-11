@@ -220,12 +220,15 @@
   <div class="card">
     <h2 data-zh="词表" data-tw="詞表" data-en="Glossary"></h2>
     <p class="hint"
-       data-zh="你们的事工名称、长老的名字、你们引用的圣经译本。保存后下一句就生效，不用重启。"
-       data-tw="你們的事工名稱、長老的名字、你們引用的聖經譯本。儲存後下一句就生效，不用重啟。"
-       data-en="Your ministry names, your elders' names, the Bible version you quote. Saved changes apply to the next sentence — no restart."></p>
+       data-zh="告诉翻译该怎么处理你们的专有名词。每句话都会带上这份词表，所以越短越好。以 # 开头的行是给你自己看的注释，不会进模型。保存后下一句就生效，不用重启。"
+       data-tw="告訴翻譯該怎麼處理你們的專有名詞。每句話都會帶上這份詞表，所以越短越好。以 # 開頭的行是給你自己看的註解，不會進模型。儲存後下一句就生效，不用重啟。"
+       data-en="Tells the translator how to handle your proper nouns. It rides along with every sentence, so keep it short. Lines starting with # are notes to yourself and never reach the model. Saved changes apply to the next sentence — no restart."></p>
     <textarea id="glossary" spellcheck="false"></textarea>
-    <button id="savegloss" style="margin-top:.7rem"
-            data-zh="保存词表" data-tw="儲存詞表" data-en="Save glossary"></button>
+    <div class="row" style="margin-top:.7rem;gap:.5rem">
+      <button id="savegloss" data-zh="保存词表" data-tw="儲存詞表" data-en="Save glossary"></button>
+      <button id="loadexample" data-zh="插入示例" data-tw="插入範例"
+              data-en="Insert an example"></button>
+    </div>
   </div>
 
   <div class="card wide">
@@ -247,14 +250,14 @@ const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 /* Strings the server or the meters produce at runtime, which no data- attribute can carry. */
 const STR = {
   zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台断开",
-        sysdefault:"系统默认", saved:"已保存", glossarysaved:"词表已保存",
+        sysdefault:"系统默认", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
         restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
         micprompt:"对着麦克风说话，这条会动。", micgood:"声音正常。",
         micsilent:"没有声音进来 — 检查线和上面选的设备。", micclip:"爆音了 — 把音控台的输出调小。",
         direction:"{a} 讲道 → 听众听到 {b}。", samelang:"讲员说的和听众听到的是同一种语言，不会有翻译。",
         heard:"听到", translated:"翻译" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
-        sysdefault:"系統預設", saved:"已儲存", glossarysaved:"詞表已儲存",
+        sysdefault:"系統預設", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
         restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
         micprompt:"對著麥克風說話，這條會動。", micgood:"聲音正常。",
         micsilent:"沒有聲音進來 — 檢查線和上面選的裝置。", micclip:"爆音了 — 把音控台的輸出調小。",
@@ -262,7 +265,7 @@ const STR = {
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
         nolink:"no console link", sysdefault:"System default", saved:"Saved",
-        glossarysaved:"Glossary saved", restarting:"Restarting — models take a minute",
+        glossarysaved:"Glossary saved", exampleadded:"Example added — edit it for your church, then save", restarting:"Restarting — models take a minute",
         restartneeded:"Restart to apply — the new model has to load.",
         micprompt:"Speak into the mic — the bar should move.", micgood:"Audio looks good.",
         micsilent:"No audio reaching the Mac — check the cable and the device above.",
@@ -298,6 +301,12 @@ let qrUrl = null;            // the URL the QR on screen actually encodes
 const t = (key) => STR[lang][key];
 
 /* Spoken/heard language names, per console language. */
+const PLACEHOLDER = {
+  zh: "# 注释写在 # 后面，不会进模型\n\n翻译以下词汇时请统一用法：\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\n引用圣经请用和合本的用词。",
+  tw: "# 註解寫在 # 後面，不會進模型\n\n翻譯以下詞彙時請統一用法：\n  fellowship -> 團契\n  Pastor John Smith -> 史約翰牧師\n\n引用聖經請用和合本的用詞。",
+  en: "# notes after a # are never sent to the model\n\nRender these terms consistently:\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\nQuote scripture in 和合本 wording.",
+};
+
 const LANGNAME = {
   zh: { en:"英文", zh:"中文", auto:"自动判断", "zh-Hans":"简体中文", "zh-Hant":"繁体中文" },
   tw: { en:"英文", zh:"中文", auto:"自動判斷", "zh-Hans":"簡體中文", "zh-Hant":"繁體中文" },
@@ -317,6 +326,7 @@ function render() {
   document.querySelectorAll("[data-en]").forEach((el) => {
     el.textContent = el.dataset[lang] || el.dataset.en;
   });
+  $("glossary").placeholder = PLACEHOLDER[lang];
   document.querySelectorAll("#langseg button").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
   });
@@ -383,6 +393,16 @@ const post = (path, body) =>
 $("startbtn").onclick = () => post("/api/start");
 $("stopbtn").onclick = () => post("/api/stop");
 $("restartbtn").onclick = () => { post("/api/restart"); restartPending = false; toast("restarting"); };
+$("loadexample").onclick = () => fetch("/api/glossary/example")
+  .then((r) => (r.ok ? r.text() : "")).then((text) => {
+    if (!text) return;
+    const box = $("glossary");
+    box.value = box.value.trim() ? box.value.replace(/\s*$/, "\n\n") + text : text;
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+    toast("exampleadded");
+  });
+
 $("savegloss").onclick = () =>
   post("/api/glossary", { text: $("glossary").value }).then(() => toast("glossarysaved"));
 

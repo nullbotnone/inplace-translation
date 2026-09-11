@@ -79,6 +79,23 @@ assert "Grace Chapel" not in bridge.instructions(en2zh)
 bridge.GLOSSARY_PATH.write_text("  Grace Chapel -> 恩典堂  ")
 assert "Grace Chapel -> 恩典堂" in bridge.instructions(en2zh), "glossary edit not picked up"
 
+# '#' lines are notes to the operator and must never become instructions to the model
+bridge.GLOSSARY_PATH.write_text(
+    "# Copy this file and edit it\n"
+    "  # indented comments count too\n"
+    "elder -> 长老\n"
+    "not#a#comment -> ok\n")
+prompt = bridge.instructions(en2zh)
+assert "Copy this file" not in prompt and "indented comments" not in prompt
+assert "elder -> 长老" in prompt and "not#a#comment -> ok" in prompt
+
+# the shipped example is safe to paste in whole: nothing in it addresses the reader
+example = (Path(__file__).parent / "glossary.example.txt")
+bridge.GLOSSARY_PATH.write_text(example.read_text())
+prompt = bridge.instructions(en2zh)
+assert "#" not in prompt.split(bridge.base_prompt(en2zh))[-1], "a comment survived"
+assert "团契" in prompt, "the example contributed nothing"
+
 # the spoken language reaches the recognition flag, not just the prompt
 p0 = bridge.Pipeline()
 p0.cfg = dict(zh2en)

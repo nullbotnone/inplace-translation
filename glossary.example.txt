@@ -1,13 +1,20 @@
-Copy this to glossary.txt and replace the placeholders with your own. Every line here is
-appended to the translator's prompt on every single utterance, so it costs latency: keep it
-to the terms your congregation would notice getting wrong, not a dictionary. Thirty lines is
-plenty; two hundred will slow the translation down measurably.
+# Lines starting with # are notes to yourself. They are stripped before the model sees
+# anything, so you can annotate freely.
+#
+# Everything else is appended to the translator's prompt on EVERY utterance, so it costs
+# latency on every sentence of the sermon. Keep it to the terms your congregation would
+# notice getting wrong. Thirty lines is plenty; two hundred will slow the translation
+# down measurably.
+#
+# Replace the placeholder names below with your own, and delete anything you don't need.
 
 House style for this congregation:
 
 Quote scripture in 和合本 wording, and use its Chinese book names. Keep chapter and verse
 in digits: "John 3:16" -> "约翰福音 3:16".
 
+# Terms a small model reliably gets wrong. Yours will differ by denomination —
+# 洗礼 vs 浸礼 is the usual one to check.
 Render these terms consistently:
   fellowship -> 团契 (never 友谊)
   small group / cell group -> 小组
@@ -25,6 +32,7 @@ Render these terms consistently:
   stewardship -> 管家的职分
   elder -> 长老; deacon -> 执事
 
+# Names matter more than vocabulary: a mangled name is what people notice.
 Names, always in this form:
   Pastor John Smith -> 史约翰牧师
   Elder Mary Chen -> 陈美丽长老
