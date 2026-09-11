@@ -144,12 +144,15 @@ h1, h2 { margin: 0; font-family: var(--display); font-weight: 500;
 .band-head h2 { font-size: clamp(2.3rem, 4.5vw, 4rem); }
 .band-head > p { margin: 0; color: var(--ink-soft); }
 
-.prose { max-width: 42rem; margin: 0; color: var(--ink-soft); }
+:root { --measure: 44rem; }        /* shared text column: prose, code, notes */
+.prose { max-width: var(--measure); margin: 0; color: var(--ink-soft); }
 .prose + .prose { margin-top: 1.1rem; }
 .lead-in { margin-top: 2rem; }
-.warn-note { max-width: 42rem; margin: 1.5rem 0 0; padding: 1rem 1.2rem; border-radius: 10px;
-             border: 1px solid var(--line-strong); background: var(--surface);
-             color: var(--ink-soft); font-size: .9rem; line-height: 1.7; }
+.warn-note + .prose { margin-top: 1.5rem; }
+.warn-note { max-width: var(--measure); margin: 1.5rem 0 0; padding: 1rem 1.2rem;
+             border-radius: 10px; border: 1px solid var(--line-strong);
+             background: var(--surface); color: var(--ink-soft);
+             font-size: .9rem; line-height: 1.7; }
 
 .stage { padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid var(--line);
          border-radius: var(--radius); background: var(--surface); }
@@ -168,7 +171,8 @@ h1, h2 { margin: 0; font-family: var(--display); font-weight: 500;
 .req { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
 .req li { padding: .25rem .7rem; border: 1px solid var(--line); border-radius: 999px;
           color: var(--ink-soft); font-size: .78rem; }
-pre { margin: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius);
+pre { margin: 0; max-width: var(--measure); overflow-x: auto;
+      border: 1px solid var(--line); border-radius: var(--radius);
       background: #061014; color: #f1eadb; padding: clamp(1.2rem, 3vw, 1.9rem);
       font: .85rem/1.9 var(--mono); }
 pre .c { color: #77837d; }
@@ -180,7 +184,8 @@ pre .c { color: #77837d; }
 .limits b { display: block; margin-bottom: .35rem; font-weight: 650; }
 .limits p { margin: 0; color: var(--ink-soft); font-size: .93rem; line-height: 1.7; }
 
-.spec { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.spec { width: 100%; max-width: var(--measure); border-collapse: collapse;
+        font-size: .92rem; }
 .spec td { padding: .85rem 0; border-bottom: 1px solid var(--line); color: var(--ink-soft);
            vertical-align: top; }
 .spec td:first-child { width: 34%; padding-right: 1.5rem; color: var(--ink);
