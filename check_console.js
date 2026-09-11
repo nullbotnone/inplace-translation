@@ -8,11 +8,14 @@ const src = fs.readFileSync(`${__dirname}/admin.html`, "utf8");
 const script = src.slice(src.indexOf("<script>") + 8, src.lastIndexOf("</script>"));
 
 const ids = [...src.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
-const attrEls = [...src.matchAll(/<[^>]*\bdata-en="[^"]*"[^>]*>/g)].map(() => el());
+// keep track of which translatable nodes are <option>s: rewriting those under an open
+// native dropdown closes it, so a status repaint must never touch them
+const attrEls = [...src.matchAll(/<([a-z]+)[^>]*\bdata-en="[^"]*"[^>]*>/g)]
+  .map((m) => el(m[1]));
 
 function el(tag = "div") {
   const e = {
-    tag, dataset: {}, style: {}, children: [], textContent: "", value: "", innerHTML: "",
+    tag, dataset: {}, style: {}, children: [], value: "", innerHTML: "",
     className: "", placeholder: "", disabled: false, type: "",
     classList: { add() {}, remove() {}, contains: () => false },
     setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; },
@@ -21,6 +24,12 @@ function el(tag = "div") {
     querySelector: () => null, querySelectorAll: () => [], closest: () => null,
     remove() {}, focus() {}, setSelectionRange() {}, addEventListener() {},
   };
+  let text = "";
+  e.writes = 0;
+  Object.defineProperty(e, "textContent", {
+    get: () => text,
+    set(v) { text = v; e.writes++; },
+  });
   return e;
 }
 
@@ -76,6 +85,20 @@ for (const [name, data] of [["status", status], ["line", { kind: "out", text: "ç
   } catch (e) {
     errors.push(`on ${name}: ${e.message}`);
   }
+}
+
+// a status repaint must not relabel the option lists
+const optionWrites = () => attrEls.filter((e) => e.tag === "option")
+                                  .reduce((n, e) => n + e.writes, 0);
+const before = optionWrites();
+try {
+  listeners.status({ data: JSON.stringify({ ...status, listeners: 9 }) });
+} catch (e) {
+  errors.push(`on second status: ${e.message}`);
+}
+if (optionWrites() !== before) {
+  errors.push("a status update rewrote <option> text; that closes an open dropdown " +
+              "and makes the selects unusable");
 }
 
 if (errors.length) {

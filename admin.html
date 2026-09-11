@@ -320,8 +320,9 @@ function applyTheme() {
   $("themebtn").dataset.mode = theme;
 }
 
-/* One render path: static labels from data- attributes, everything else from STR. */
-function render() {
+/* Language-driven. Only ever called when the console language changes, because rewriting
+   <option> text under an open dropdown closes it, and the heartbeat paints twice a second. */
+function labels() {
   document.documentElement.lang = HTML_LANG[lang];
   document.querySelectorAll("[data-en]").forEach((el) => {
     el.textContent = el.dataset[lang] || el.dataset.en;
@@ -330,13 +331,16 @@ function render() {
   document.querySelectorAll("#langseg button").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
   });
-
   if (deviceList) {
     const keep = $("device").value;
     $("device").innerHTML = `<option value="">${t("sysdefault")}</option>` +
       deviceList.map((d) => `<option value="${d.index}">${d.name} (${d.channels} ch)</option>`).join("");
     $("device").value = keep;
   }
+}
+
+/* Status-driven, runs on every heartbeat. Touches text and values, never option lists. */
+function paint() {
   $("restarthint").textContent = restartPending ? t("restartneeded") : "";
   $("restarthint").className = "hint" + (restartPending ? " warn" : "");
 
@@ -379,6 +383,8 @@ function render() {
   if (document.activeElement !== $("glossary")) $("glossary").value = s.glossary;
 }
 
+const render = () => { labels(); paint(); };
+
 const toast = (key) => {
   $("toast").textContent = t(key);
   $("toast").classList.add("show");
@@ -391,7 +397,7 @@ const post = (path, body) =>
 
 $("startbtn").onclick = () => post("/api/start");
 $("stopbtn").onclick = () => post("/api/stop");
-$("restartbtn").onclick = () => { post("/api/restart"); restartPending = false; toast("restarting"); };
+$("restartbtn").onclick = () => { post("/api/restart"); restartPending = false; paint(); toast("restarting"); };
 $("loadexample").onclick = () => fetch("/api/glossary/example")
   .then((r) => (r.ok ? r.text() : "")).then((text) => {
     if (!text) return;
@@ -424,7 +430,7 @@ CFG.forEach((key) => $(key).addEventListener("change", () => {
   if (key === "device") value = el.value === "" ? null : Number(el.value);
   post("/api/config", { [key]: value }).then((r) => {
     restartPending = r.restart_required;
-    render();
+    paint();
     toast("saved");
   });
 }));
@@ -457,10 +463,10 @@ function addLine(line) {
 }
 
 const es = new EventSource("/api/events");
-es.addEventListener("status", (e) => { linkLost = false; current = JSON.parse(e.data); render(); });
+es.addEventListener("status", (e) => { linkLost = false; current = JSON.parse(e.data); paint(); });
 es.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
-es.onopen = () => { linkLost = false; render(); };
-es.onerror = () => { linkLost = true; render(); };
+es.onopen = () => { linkLost = false; paint(); };
+es.onerror = () => { linkLost = true; paint(); };
 
 applyTheme();
 render();
