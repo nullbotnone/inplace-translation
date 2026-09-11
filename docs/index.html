@@ -207,26 +207,28 @@
     <div class="band-head">
       <div>
         <p class="kicker"><b>03</b> / <span data-zh="安装" data-tw="安裝" data-en="Setup"></span></p>
-        <h2 data-zh="一个下午就能装好" data-tw="一個下午就能裝好" data-en="An afternoon's work"></h2>
+        <h2 data-zh="一小时内就能装好" data-tw="一小時內就能裝好" data-en="Under an hour"></h2>
       </div>
-      <p data-zh="仓库里带了一个 launchd 服务，开机自己起来，主日早上不用有人去开终端。"
-         data-tw="倉庫裡帶了一個 launchd 服務，開機自己起來，主日早上不用有人去開終端機。"
-         data-en="The repo ships a launchd agent so it comes up on its own, and nobody has to open a terminal on Sunday morning."></p>
+      <p data-zh="大部分时间是在等模型下载，要敲的命令五分钟就完事。装好以后有个 launchd 服务会自己把它拉起来，其余的设置都在浏览器里点——主日早上不用有人去开终端。"
+         data-tw="大部分時間是在等模型下載，要敲的命令五分鐘就完事。裝好以後有個 launchd 服務會自己把它拉起來，其餘的設定都在瀏覽器裡點——主日早上不用有人去開終端機。"
+         data-en="Most of that is waiting for the models to download; the typing is five minutes. After the first run a launchd agent brings it up on its own and everything else is set from a page in the browser, so nobody has to open a terminal on Sunday morning."></p>
     </div>
 
     <ul class="req">
       <li data-zh="Apple Silicon Mac" data-tw="Apple Silicon Mac" data-en="Apple Silicon Mac"></li>
       <li data-zh="16 GB 内存" data-tw="16 GB 記憶體" data-en="16 GB memory"></li>
       <li data-zh="USB 音频接口" data-tw="USB 音訊介面" data-en="USB audio interface"></li>
+      <li data-zh="Python 3.12" data-tw="Python 3.12" data-en="Python 3.12"></li>
       <li data-zh="约 8 GB 模型下载" data-tw="約 8 GB 模型下載" data-en="~8 GB of model downloads"></li>
     </ul>
 
-<pre><code>git clone https://github.com/nullbotnone/inplace-translation
+<pre><code>brew install ffmpeg python@3.12   <span class="c"># 3.13+ will not resolve</span>
+git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install speech-to-speech segno &amp;&amp; brew install ffmpeg
+python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install speech-to-speech segno
 
-./start.sh          <span class="c"># prints the QR code for your bulletin</span></code></pre>
+./start.sh          <span class="c"># prints a QR code, then open localhost:8000/admin</span></code></pre>
   </section>
 
   <section class="band">
