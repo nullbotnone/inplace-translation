@@ -27,6 +27,8 @@
      text-transform:uppercase;color:var(--dim)}
   header{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;
          padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
+  .actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding-top:1.1rem}
+  .actions-inline{margin-top:.7rem;gap:.5rem}
   .grow{flex:1}
 
   .state{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .8rem;border-radius:999px;
@@ -65,14 +67,20 @@
                                        box-shadow:inset -.32rem -.2rem 0 currentColor}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 
-  .cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(19rem,1fr));margin-top:1.5rem}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.2rem}
+  /* Two deliberate columns rather than auto-fit: the cards are paired by height, so the
+     two short ones share a row and the two tall ones share the next. */
+  .cards{display:grid;gap:1rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:1.5rem}
+  @media (max-width:46rem){.cards{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+        padding:1.2rem;display:flex;flex-direction:column}
   .card.wide{grid-column:1/-1}
   label{display:block;margin-bottom:1rem}
+  .card > label:last-of-type{margin-bottom:.6rem}
+  .card .hint:last-child{margin-top:auto;padding-top:.6rem}
   label span{display:block;margin-bottom:.3rem;font-size:.82rem;color:var(--dim)}
   select,input[type=number],textarea{width:100%;font:inherit;font-size:.88rem;color:var(--ink);
     background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem}
-  textarea{min-height:11rem;font:.82rem/1.7 var(--mono);resize:vertical}
+  textarea{min-height:9rem;flex:1;font:.82rem/1.7 var(--mono);resize:vertical}
   .row{display:flex;gap:.8rem;align-items:flex-end}
   .row label{flex:1}
   .hint{margin:0;font-size:.8rem;color:var(--dim)}
@@ -83,15 +91,16 @@
   .meter i.hot{background:var(--bad)}
   .meter i.quiet{background:var(--dim)}
 
-  .stat{display:flex;justify-content:space-between;padding:.45rem 0;font-size:.88rem}
+  .stat{display:flex;justify-content:space-between;align-items:center;
+        margin-top:auto;padding-top:.8rem;font-size:.88rem}
   .stat span{color:var(--dim);font-family:var(--mono);font-size:.82rem}
 
   #qr{display:grid;place-items:center;padding:.8rem;background:#fff;border-radius:10px}
-  #qr svg{display:block;width:100%;height:auto;max-width:13rem}
+  #qr svg{display:block;width:100%;height:auto;max-width:11rem}
   .url{margin:.7rem 0 0;text-align:center;font:.85rem/1.5 var(--mono);word-break:break-all;
        color:var(--accent)}
 
-  #log{margin:0;padding:0;list-style:none;max-height:22rem;overflow-y:auto}
+  #log{margin:0;padding:0;list-style:none;height:16rem;overflow-y:auto}
   #log li{padding:.5rem 0;border-bottom:1px solid var(--line)}
   #log li:last-child{border-bottom:0}
   #log .t{color:var(--dim);font:.7rem/1 var(--mono);letter-spacing:.08em}
@@ -127,13 +136,13 @@
   </button>
 </header>
 
-<header style="border:0;padding-top:1rem">
+<div class="actions">
   <button class="primary" id="startbtn" data-zh="启动" data-tw="啟動" data-en="Start"></button>
   <button id="stopbtn" data-zh="停止" data-tw="停止" data-en="Stop"></button>
   <button id="restartbtn" data-zh="重启" data-tw="重啟" data-en="Restart"></button>
   <span class="grow"></span>
   <p class="hint" id="detail"></p>
-</header>
+</div>
 
 <div class="cards">
 
@@ -167,16 +176,6 @@
     </label>
     <div class="meter"><i id="level"></i></div>
     <p class="hint" id="levelhint"></p>
-  </div>
-
-  <div class="card">
-    <h2 data-zh="听众" data-tw="聽眾" data-en="Listeners"></h2>
-    <div id="qr"></div>
-    <p class="url" id="url"></p>
-    <div class="stat">
-      <b data-zh="当前连接" data-tw="目前連線" data-en="Connected now"></b>
-      <span id="listeners">0</span>
-    </div>
   </div>
 
   <div class="card">
@@ -217,13 +216,23 @@
   </div>
 
   <div class="card">
+    <h2 data-zh="听众" data-tw="聽眾" data-en="Listeners"></h2>
+    <div id="qr"></div>
+    <p class="url" id="url"></p>
+    <div class="stat">
+      <b data-zh="当前连接" data-tw="目前連線" data-en="Connected now"></b>
+      <span id="listeners">0</span>
+    </div>
+  </div>
+
+  <div class="card">
     <h2 data-zh="词表" data-tw="詞表" data-en="Glossary"></h2>
     <p class="hint"
        data-zh="告诉翻译该怎么处理你们的专有名词。每句话都会带上这份词表，所以越短越好。以 # 开头的行是给你自己看的注释，不会进模型。保存后下一句就生效，不用重启。"
        data-tw="告訴翻譯該怎麼處理你們的專有名詞。每句話都會帶上這份詞表，所以越短越好。以 # 開頭的行是給你自己看的註解，不會進模型。儲存後下一句就生效，不用重啟。"
        data-en="Tells the translator how to handle your proper nouns. It rides along with every sentence, so keep it short. Lines starting with # are notes to yourself and never reach the model. Saved changes apply to the next sentence — no restart."></p>
     <textarea id="glossary" spellcheck="false"></textarea>
-    <div class="row" style="margin-top:.7rem;gap:.5rem">
+    <div class="row actions-inline">
       <button id="savegloss" data-zh="保存词表" data-tw="儲存詞表" data-en="Save glossary"></button>
       <button id="loadexample" data-zh="插入示例" data-tw="插入範例"
               data-en="Insert an example"></button>
