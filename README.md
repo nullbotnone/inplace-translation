@@ -68,6 +68,16 @@ prompt never appears, grant it by hand in System Settings → Privacy & Security
 
 ## Run
 
+**Double-click `Start Translation.command` in Finder.** A Terminal window opens, everything
+starts, and the console appears in your browser on its own. Leave the window open; closing it
+stops the translation. Nobody needs to type anything.
+
+The first time, macOS may refuse it with *"cannot be opened because it is from an
+unidentified developer"* — that happens when the project arrived as a downloaded zip rather
+than a `git clone`. Right-click the file once and choose **Open**, and it will not ask again.
+
+From a terminal, the same thing:
+
 ```bash
 ./start.sh
 ```
