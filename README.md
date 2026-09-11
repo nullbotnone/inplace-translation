@@ -173,7 +173,8 @@ All of this lives in the console; the notes below are why each one is there.
 ```bash
 python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out,
                          # config persistence, and that the console refuses the LAN
-python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids
+python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids,
+                         # and the console script actually runs (needs node)
 ```
 
 The pipeline itself has no self-check here: start it and read `sermon.log`, where every

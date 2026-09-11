@@ -96,5 +96,14 @@ head = page[:page.index('</head>')]
 for dep in ('href="/styles.css"', 'href="/favicon.svg"'):
     assert dep not in head, f"docs/index.html is not self-contained: {dep}"
 
+# static checks cannot see a runtime error; run the script if node is available
+import shutil, subprocess
+if shutil.which("node"):
+    r = subprocess.run(["node", str(HERE / "check_console.js")], capture_output=True, text=True)
+    assert r.returncode == 0, "check_console.js: " + (r.stderr.strip() or r.stdout.strip())
+    print(r.stdout.strip())
+else:
+    print("note: node not found, skipped the console runtime check")
+
 print(f"ok: console {n_admin} labels + {len(keys['en'])} runtime strings x3 langs, "
       f"{n_tokens} themed tokens; landing page {n_page} labels")

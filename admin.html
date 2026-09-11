@@ -337,14 +337,6 @@ function render() {
       deviceList.map((d) => `<option value="${d.index}">${d.name} (${d.channels} ch)</option>`).join("");
     $("device").value = keep;
   }
-  if (s) {
-    const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
-    const same = s.config.source === "en" ? s.config.target === "en"
-               : s.config.source === "zh" ? s.config.target.startsWith("zh") : false;
-    $("langhint").textContent = same ? t("samelang")
-      : t("direction").replace("{a}", from).replace("{b}", into);
-    $("langhint").className = "hint" + (same ? " warn" : "");
-  }
   $("restarthint").textContent = restartPending ? t("restartneeded") : "";
   $("restarthint").className = "hint" + (restartPending ? " warn" : "");
 
@@ -352,6 +344,13 @@ function render() {
   if (linkLost) { $("state").dataset.s = "error"; $("statetext").textContent = t("nolink"); }
   else if (s) { $("state").dataset.s = s.state; $("statetext").textContent = t(s.state); }
   if (!s) return;
+
+  const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
+  const same = s.config.source === "en" ? s.config.target === "en"
+             : s.config.source === "zh" ? s.config.target.startsWith("zh") : false;
+  $("langhint").textContent = same ? t("samelang")
+    : t("direction").replace("{a}", from).replace("{b}", into);
+  $("langhint").className = "hint" + (same ? " warn" : "");
 
   $("detail").textContent = s.detail || "";
   $("listeners").textContent = s.listeners;
