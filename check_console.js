@@ -77,7 +77,7 @@ const status = {
   config: { device: null, source: "en", target: "zh-Hans",
             model: "mlx-community/Qwen3-4B-Instruct-2507-4bit", stt: "mlx-audio-whisper",
             tts: "qwen3", chat_size: 2, min_silence_ms: 64 },
-  listeners: 3, level: 0.42, glossary: "elder -> 长老",
+  listeners: 3, level: 0.42,
   url: "http://192.168.1.50:8000/",
 };
 for (const [name, data] of [["status", status], ["line", { kind: "out", text: "神爱世人", at: "10:31:02" }]]) {
@@ -86,6 +86,13 @@ for (const [name, data] of [["status", status], ["line", { kind: "out", text: "�
   } catch (e) {
     errors.push(`on ${name}: ${e.message}`);
   }
+}
+
+// a repaint must not overwrite the glossary the operator is part-way through editing
+byId.glossary.value = "half-typed edit";
+try { listeners.status({ data: JSON.stringify(status) }); } catch (e) { errors.push(e.message); }
+if (byId.glossary.value !== "half-typed edit") {
+  errors.push("a status update overwrote the glossary textarea");
 }
 
 // a status repaint must not relabel the option lists

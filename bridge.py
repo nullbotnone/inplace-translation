@@ -39,7 +39,6 @@ TARGETS = {"en": "English", "zh": "Chinese"}
 # Listeners hear audio, where 简体 vs 繁體 does not exist. It only shows up in the
 # subtitles, so a church that wants Traditional asks for it in the glossary instead.
 LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
-STT_LANG = {"en": "en", "zh": "zh", "auto": "auto"}
 
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.
@@ -132,8 +131,31 @@ def port_open(port):
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+_ip_cache = (0.0, "127.0.0.1")
+
+
 def lan_ip():
+    """Cached: status() runs twice a second and this opens a socket. A church LAN with no
+    route to the internet is normal, so never let this be the thing that breaks the page."""
+    global _ip_cache
+    at, value = _ip_cache
+    if time.monotonic() - at < 30:
+        return value
+    for attempt in (lambda: _probe_route(), lambda: socket.gethostbyname(socket.gethostname())):
+        try:
+            found = attempt()
+            if found and not found.startswith("127."):
+                _ip_cache = (time.monotonic(), found)
+                return found
+        except OSError:
+            continue
+    _ip_cache = (time.monotonic(), value)
+    return value
+
+
+def _probe_route():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(.4)
         s.connect(("8.8.8.8", 80))
         return s.getsockname()[0]
 
@@ -165,7 +187,6 @@ class Pipeline:
     def status(self):
         return {"state": self.state, "detail": self.detail, "config": self.cfg,
                 "listeners": audio.count(), "level": round(self.level, 3),
-                "glossary": GLOSSARY_PATH.read_text() if GLOSSARY_PATH.exists() else "",
                 "url": f"http://{lan_ip()}:{HTTP_PORT}/"}
 
     def _set(self, state, detail=""):
@@ -209,7 +230,7 @@ class Pipeline:
     def _command(self):
         c = self.cfg
         return ["speech-to-speech", "serve", "--mac-optimal-settings",
-                "--stt", c["stt"], "--language", STT_LANG[c["source"]], "--tts", c["tts"],
+                "--stt", c["stt"], "--language", c["source"], "--tts", c["tts"],
                 "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
                 "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1"]
 
@@ -218,6 +239,7 @@ class Pipeline:
             with contextlib.suppress(Exception):
                 self.mic.close()
             self.mic = None
+        self.level = 0.0
         if self.ws:
             with contextlib.suppress(Exception):
                 self.ws.close()
@@ -286,7 +308,10 @@ class Pipeline:
         self.cfg.update(changed)
         CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
         if "device" in changed and self.state == "running":
-            self.open_mic()
+            try:
+                self.open_mic()
+            except Exception as exc:
+                self._set("error", f"cannot open that input: {exc}")
         if "target" in changed and self.state == "running":
             self.apply_instructions()
         events.publish(("status", self.status()))
@@ -307,6 +332,14 @@ def devices():
         return {"devices": [], "error": f"Cannot read audio devices: {exc}"}
 
 
+def broadcast_died(why):
+    """Both encoder threads are daemons: without this the stream just stops, forever,
+    with nothing on screen to say so."""
+    print(f"!! {why}", flush=True)
+    if pipeline.state == "running":
+        pipeline._set("error", why)
+
+
 def pacer(stdin, stop=None):
     """Feed ffmpeg at wall-clock rate: translated audio when we have it, silence otherwise."""
     silence, buf = b"\0" * (BLOCK * 2), b""
@@ -321,15 +354,25 @@ def pacer(stdin, stop=None):
             with out_q.mutex:
                 out_q.queue.clear()
         chunk, buf = (buf[:BLOCK * 2], buf[BLOCK * 2:]) if len(buf) >= BLOCK * 2 else (silence, buf)
-        stdin.write(chunk)
-        stdin.flush()
+        try:
+            stdin.write(chunk)
+            stdin.flush()
+        except OSError as exc:
+            return broadcast_died(f"the audio encoder went away: {exc}")
         n += 1
-        time.sleep(max(0, t0 + n * BLOCK / RATE - time.monotonic()))
+        # E. After a sleep or a long stall the schedule is far in the past; catching up would
+        # dump a burst of audio at listeners. Start the clock again instead.
+        behind = time.monotonic() - (t0 + n * BLOCK / RATE)
+        if behind > 2:
+            t0, n = time.monotonic(), 0
+        else:
+            time.sleep(max(0, -behind))
 
 
 def fanout(stdout):
     while chunk := stdout.read(1024):
         audio.publish(chunk)
+    broadcast_died("the audio encoder stopped producing output")
 
 
 def heartbeat():
@@ -407,6 +450,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.local_only():
                 self.stream(events, "text/event-stream",
                             [("status", pipeline.status())] + [("line", l) for l in list(recent)])
+        elif path == "/api/glossary":
+            if self.local_only():
+                self.send_json({"text": GLOSSARY_PATH.read_text()
+                                if GLOSSARY_PATH.exists() else ""})
         elif path == "/api/glossary/example":
             if self.local_only():
                 self.send_file("glossary.example.txt", "text/plain; charset=utf-8")
@@ -430,8 +477,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.local_only():
             return
-        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-        data = json.loads(body) if body else {}
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > 1 << 20:
+            return self.send_error(413, "too large")
+        try:
+            body = self.rfile.read(length)
+            data = json.loads(body) if body else {}
+        except (ValueError, OSError) as exc:
+            return self.send_error(400, f"bad request body: {exc}")
         path = self.path.split("?")[0]
         if path == "/api/start":
             pipeline.start()
@@ -477,7 +530,10 @@ def main():
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        pass
+    finally:
         pipeline.stop()
+        ff.terminate()
 
 
 if __name__ == "__main__":

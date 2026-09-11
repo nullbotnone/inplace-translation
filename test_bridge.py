@@ -1,5 +1,5 @@
 """Self-check: python3 test_bridge.py"""
-import json, queue, tempfile, threading, time
+import json, queue, socket, tempfile, threading, time
 from pathlib import Path
 
 import bridge
@@ -138,6 +138,33 @@ saved = json.loads(bridge.CONFIG_PATH.read_text())
 assert saved["device"] == 3 and saved["chat_size"] == 4 and saved["model"] == "m"
 assert "nonsense" not in saved, "unknown key reached the config file"
 assert set(saved) == set(bridge.DEFAULTS), "config file shape drifted from DEFAULTS"
+
+# an isolated church LAN with no route to the internet must not break the status page
+real_probe, real_resolve = bridge._probe_route, socket.gethostbyname
+def unreachable(*a, **k): raise OSError("Network is unreachable")
+bridge._probe_route = unreachable
+socket.gethostbyname = unreachable
+bridge._ip_cache = (0.0, "127.0.0.1")
+assert bridge.lan_ip() == "127.0.0.1", "no route should fall back, not raise"
+bridge._probe_route = lambda: "192.168.1.50"
+bridge._ip_cache = (0.0, "127.0.0.1")
+assert bridge.lan_ip() == "192.168.1.50"
+assert bridge.lan_ip() == "192.168.1.50", "second call should come from the cache"
+bridge._probe_route, socket.gethostbyname = real_probe, real_resolve
+
+# a dying encoder has to surface: both encoder threads are daemons nobody watches
+p2 = bridge.Pipeline()
+saved, bridge.pipeline = bridge.pipeline, p2
+p2.state = "running"
+class Dead:
+    def write(self, b): raise BrokenPipeError("ffmpeg is gone")
+    def flush(self): pass
+stop = threading.Event()
+th = threading.Thread(target=bridge.pacer, args=(Dead(), stop), daemon=True)
+th.start(); th.join(2)
+assert not th.is_alive(), "pacer should return when the encoder dies"
+assert p2.state == "error" and "encoder" in p2.detail, f"death not surfaced: {p2.state}"
+bridge.pipeline = saved
 
 # the console must not be reachable from the church wifi
 class Stub(bridge.Handler):
