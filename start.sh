@@ -27,7 +27,14 @@ fi
 
 source .venv/bin/activate
 
-# Kill the whole process group on exit, so the models never outlive the bridge.
-trap 'kill 0' EXIT INT TERM
+# bridge.py has to run in the background: bash defers a trap until the current foreground
+# command finishes, so with it in the foreground this cleanup could never run, and a TERM
+# from launchd or the app left the models resident with the broadcast still live.
+# `kill 0` is wrong here too - it would take our own parent down before it could report why.
+child=""
+cleanup() { [ -n "$child" ] && kill -TERM "$child" 2>/dev/null; }
+trap cleanup EXIT INT TERM
 
-caffeinate -i python3 bridge.py "$@"
+caffeinate -i python3 bridge.py "$@" &
+child=$!
+wait "$child"

@@ -7,7 +7,7 @@ an operator console at http://localhost:8000/admin
 
     python3 bridge.py
 """
-import argparse, array, base64, contextlib, json, queue, socket, subprocess, sys, threading, time
+import argparse, array, base64, contextlib, json, queue, signal, socket, subprocess, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -521,6 +521,10 @@ def main():
     for fn, a in ((pacer, (ff.stdin,)), (fanout, (ff.stdout,)), (heartbeat, ())):
         threading.Thread(target=fn, args=a, daemon=True).start()
 
+    # Default SIGTERM kills the interpreter outright, skipping the cleanup below and
+    # orphaning ffmpeg and the pipeline. launchd and the app bundle both send TERM.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+
     server = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
     url = pipeline.status()["url"]
     print(f"\n  Listeners: {url}\n  Console:   http://localhost:{HTTP_PORT}/admin\n")
@@ -531,7 +535,7 @@ def main():
         pipeline.start()
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         pipeline.stop()

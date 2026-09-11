@@ -68,13 +68,22 @@ prompt never appears, grant it by hand in System Settings → Privacy & Security
 
 ## Run
 
-**Double-click `Start Translation.command` in Finder.** A Terminal window opens, everything
-starts, and the console appears in your browser on its own. Leave the window open; closing it
-stops the translation. Nobody needs to type anything.
+**Double-click `Sermon Translation.app`.** It starts everything and opens the console in your
+browser; there is no Terminal window and nothing to type. Quitting it from the Dock stops the
+translation and frees the memory the models were holding. Double-clicking it again while it is
+already running just brings the console back up.
+
+Keep the app inside the project folder — it finds `start.sh` next to itself, and says so if
+you move it. Drag it to the Dock for a shortcut rather than to Applications.
 
 The first time, macOS may refuse it with *"cannot be opened because it is from an
 unidentified developer"* — that happens when the project arrived as a downloaded zip rather
-than a `git clone`. Right-click the file once and choose **Open**, and it will not ask again.
+than a `git clone`. Right-click it once and choose **Open**, and it will not ask again. It
+will also ask for the microphone the first time; that prompt comes from the app, and it has
+to be allowed.
+
+Anything it prints goes to `sermon.log`, and a failed start shows a dialog with the last few
+lines.
 
 From a terminal, the same thing:
 

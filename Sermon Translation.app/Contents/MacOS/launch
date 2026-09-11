@@ -1,0 +1,48 @@
+#!/bin/bash
+# The app bundle is a thin wrapper: it lives inside the project folder, so the project
+# is three levels up from this executable. Everything real is in start.sh.
+here="$(cd "$(dirname "$0")/../../.." && pwd)"
+console="http://127.0.0.1:8000/admin"
+
+say() { osascript -e "display dialog \"$1\" buttons {\"OK\"} default button 1 with title \"Sermon Translation\" with icon $2" >/dev/null 2>&1; }
+
+cd "$here" || exit 1
+if [ ! -x ./start.sh ]; then
+    say "Sermon Translation has to stay inside its project folder, next to start.sh. Move it back and try again." stop
+    exit 1
+fi
+
+# Already running? Bring the console forward instead of fighting for the port. Double
+# clicking the icon twice is the most likely thing a volunteer does.
+if curl -s -o /dev/null --max-time 1 "$console"; then
+    open "$console"
+    exit 0
+fi
+
+# Open the console as soon as the server answers. The models keep loading behind it and the
+# page shows that, which is the only sign of life this app gives.
+(
+  for _ in $(seq 1 300); do
+    if curl -s -o /dev/null --max-time 1 "$console"; then open "$console"; exit 0; fi
+    sleep 1
+  done
+) &
+opener=$!
+
+# "$@" is empty when Finder launches it; it lets the same binary be run from a
+# terminal with flags when something needs debugging.
+# Run start.sh in the background and forward termination to it. Without this, quitting
+# the app orphans the whole tree: start.sh never gets the signal, so its own cleanup
+# never runs, and the models stay resident with the broadcast still live.
+./start.sh "$@" >> sermon.log 2>&1 &
+child=$!
+trap 'kill -TERM "$child" 2>/dev/null' TERM INT HUP
+wait "$child"
+status=$?
+kill "$opener" 2>/dev/null
+
+# With no Terminal window there is nowhere for an error to appear, so say it out loud.
+if [ $status -ne 0 ]; then
+    say "Sermon Translation could not start.\n\n$(tail -n 3 sermon.log | tr '"' "'" | tr '\n' ' ')\n\nFull details are in sermon.log." caution
+fi
+exit $status

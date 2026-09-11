@@ -176,4 +176,43 @@ assert Stub("::1").local_only() is True
 blocked = Stub("192.168.1.40")
 assert blocked.local_only() is False and blocked.err == 403, "console exposed to the LAN"
 
+# SIGTERM must run the cleanup, not kill the interpreter where it stands. launchd and the
+# app bundle both send it, and without this ffmpeg and the pipeline are orphaned.
+import os, subprocess, sys
+here = Path(__file__).parent
+proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start"],
+                        cwd=here, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        start_new_session=True)
+pgid = os.getpgid(proc.pid)          # read it now: it is gone once the process exits
+encoder = lambda: subprocess.run(["pgrep", "-g", str(pgid), "-f", "libmp3lame"],
+                                 capture_output=True).returncode == 0
+try:
+    for _ in range(40):
+        if encoder():
+            break
+        time.sleep(.25)
+    else:
+        raise AssertionError("the encoder never started")
+    proc.terminate()
+    code = proc.wait(timeout=15)
+    # 0 means the handler ran and the finally block cleaned up; -15 means Python was killed
+    # where it stood, which is what orphans the pipeline subprocess.
+    assert code == 0, f"SIGTERM killed it outright (exit {code}); cleanup never ran"
+    time.sleep(1)
+    assert not encoder(), "the encoder outlived the bridge"
+finally:
+    if proc.poll() is None:
+        proc.kill()
+    (here / "config.json").unlink(missing_ok=True)
+
+# stop() has to take the pipeline subprocess with it; that is the one that does not die
+# on its own when the bridge goes away.
+p4 = bridge.Pipeline()
+p4.proc = subprocess.Popen(["sleep", "300"])
+pid = p4.proc.pid
+p4.stop()
+time.sleep(.5)
+assert subprocess.run(["ps", "-p", str(pid)], capture_output=True).returncode != 0, \
+    "stop() left the pipeline process running"
+
 print("ok")
