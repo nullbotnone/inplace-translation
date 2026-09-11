@@ -43,10 +43,25 @@ the HVAC, and the PA's own output, and Whisper transcribes all of it.
 ## Setup
 
 ```bash
-brew install ffmpeg
-python3 -m venv .venv && source .venv/bin/activate
-pip install speech-to-speech segno      # segno is optional, only for the terminal QR
+brew install ffmpeg python@3.12
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install speech-to-speech segno      # segno is optional, only for the QR code
 ```
+
+**Use Python 3.12, not whatever `python3` points at.** `misaki`, which Kokoro's text
+processing pulls in, publishes nothing for 3.13 or newer. On a 3.13+ venv pip cannot resolve
+it, backtracks through every `speech-to-speech` release looking for one that does not need it,
+and finally prints a `ResolutionImpossible` wall of text that names fourteen versions and
+never says the word "Python". The one line that matters in it is:
+
+```
+Additionally, some packages in these conflicts have no matching distributions
+available for your environment:
+    misaki
+```
+
+If you hit that, `rm -rf .venv` and rebuild it with `python3.12`. `start.sh` checks the
+version at startup so it cannot bite you twice.
 
 macOS will ask Terminal for microphone permission the first time `bridge.py` runs. If the
 prompt never appears, grant it by hand in System Settings → Privacy & Security → Microphone.
