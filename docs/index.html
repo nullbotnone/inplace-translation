@@ -302,6 +302,55 @@ pip install speech-to-speech segno
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>
   </section>
+
+  <section class="band" id="disk">
+    <div class="band-head">
+      <div>
+        <p class="kicker"><b>06</b> / <span data-zh="磁盘空间" data-tw="磁碟空間" data-en="Disk space"></span></p>
+        <h2 data-zh="模型存在哪里" data-tw="模型存在哪裡" data-en="Where the models live"></h2>
+      </div>
+      <p data-zh="第一次运行会下载大约 6.6 GB，放在你的用户目录下，不在项目文件夹里。把仓库删掉并不会把这些腾出来。"
+         data-tw="第一次執行會下載大約 6.6 GB，放在你的使用者目錄下，不在專案資料夾裡。把倉庫刪掉並不會把這些騰出來。"
+         data-en="The first run downloads about 6.6 GB into your home directory, not into the project folder. Deleting the repo does not reclaim any of it."></p>
+    </div>
+
+    <table class="spec">
+      <tr><td>~/.cache/huggingface/hub</td>
+          <td data-zh="识别、翻译、语音三个模型，约 6.6 GB"
+              data-tw="辨識、翻譯、語音三個模型，約 6.6 GB"
+              data-en="The recognition, translation and voice models — about 6.6 GB"></td></tr>
+      <tr><td>~/.cache/torch/hub</td>
+          <td data-zh="Silero 语音活动检测，几 MB"
+              data-tw="Silero 語音活動偵測，幾 MB"
+              data-en="Silero voice activity detection — a few MB"></td></tr>
+    </table>
+
+    <p class="prose lead-in"
+       data-zh="要清掉的话，先激活这个项目的环境，再按名字删——只删这三个："
+       data-tw="要清掉的話，先啟用這個專案的環境，再按名字刪——只刪這三個："
+       data-en="To clear them, activate this project's environment and remove them by name:"></p>
+
+<pre><code>source .venv/bin/activate
+hf cache ls                    <span class="c"># what is cached, and how big</span>
+
+hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
+            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/whisper-large-v3-turbo \
+            model/pipecat-ai/smart-turn-v3
+
+hf cache prune                 <span class="c"># half-finished downloads</span></code></pre>
+
+    <p class="warn-note"
+       data-zh="不要直接 rm -rf ~/.cache/huggingface。这个目录是这台 Mac 上所有 Hugging Face 工具共用的，里面很可能还有你别的项目的模型。先跑 hf cache ls 看一眼。加 --dry-run 可以先预览要删什么。"
+       data-tw="不要直接 rm -rf ~/.cache/huggingface。這個目錄是這台 Mac 上所有 Hugging Face 工具共用的，裡面很可能還有你其他專案的模型。先跑 hf cache ls 看一眼。加 --dry-run 可以先預覽要刪什麼。"
+       data-en="Do not simply rm -rf ~/.cache/huggingface. That directory is shared by every Hugging Face tool on the Mac and very likely holds models belonging to your other work. Run hf cache ls first, and add --dry-run to preview what a removal would take."></p>
+
+    <p class="prose"
+       data-zh="删掉之后下次启动会重新下载，控制台会一直显示“启动中”，直到下完为止。"
+       data-tw="刪掉之後下次啟動會重新下載，控制台會一直顯示「啟動中」，直到下完為止。"
+       data-en="Once removed, the next start downloads them again, and the console sits on “starting” until it finishes."></p>
+  </section>
+
 </main>
 
 <footer>

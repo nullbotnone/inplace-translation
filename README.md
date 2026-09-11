@@ -1,4 +1,4 @@
-# Sermon translation over the church wifi
+# Translation over wifi
 
 One laptop listens to the preacher, translates EN↔ZH locally, and broadcasts the
 translated voice as an MP3 stream with live subtitles. Phones join by scanning a QR code —
@@ -170,6 +170,35 @@ All of this lives in the console; the notes below are why each one is there.
   live — a listener hears a gap, not an ever-growing delay.
 - **It will mistranslate.** Local 4–8B models get theology wrong in interesting ways. Treat
   it as a hearing aid for visitors, not as the sermon of record.
+
+## Where the models live
+
+The first run downloads about 6.6 GB into your home directory, not into the project folder,
+so deleting the repo reclaims none of it.
+
+| | |
+|---|---|
+| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~6.6 GB |
+| `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
+
+To clear them, activate this project's environment and remove them by name:
+
+```bash
+source .venv/bin/activate
+hf cache ls                    # what is cached, and how big
+
+hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
+            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/whisper-large-v3-turbo \
+            model/pipecat-ai/smart-turn-v3
+
+hf cache prune                 # half-finished downloads
+```
+
+**Do not just `rm -rf ~/.cache/huggingface`.** That directory is shared by every Hugging Face
+tool on the Mac and very likely holds models belonging to your other work. Run `hf cache ls`
+first, and add `--dry-run` to preview what a removal would take. Once removed, the next start
+downloads them again and the console sits on "starting" until it finishes.
 
 ## Self-check
 
