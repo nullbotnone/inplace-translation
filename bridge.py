@@ -460,6 +460,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/devices":
             if self.local_only():
                 self.send_json(devices())
+        elif path == "/favicon.svg":
+            self.send_file("favicon.svg", "image/svg+xml")
         elif path == "/qr.svg":
             try:
                 import segno
