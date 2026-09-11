@@ -6,3 +6,4 @@ __pycache__/
 # Church-specific names; keep it local, not in a public repo.
 # (Comments need their own line - gitignore has no trailing-comment syntax.)
 glossary.txt
+config.json

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sermon Translation · Console</title>
+<style>
+  :root{--bg:#071013;--surface:#0b181b;--surface-2:#112121;--ink:#f1eadb;--dim:#a9a899;
+        --line:#dccca429;--line-strong:#d2bb8454;--accent:#8fa7c2;--on-accent:#08151c;
+        --ok:#91a89f;--warn:#e2c57b;--bad:#c98f7b;
+        --mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,"PingFang SC",sans-serif}
+  .wrap{max-width:60rem;margin:0 auto;padding:1.5rem}
+  h1{margin:0;font-size:1.1rem;font-weight:650;letter-spacing:-.01em}
+  h2{margin:0 0 1rem;font:750 .72rem/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  header{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+         padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
+  .grow{flex:1}
+
+  .state{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .8rem;border-radius:999px;
+         border:1px solid var(--line);font:750 .72rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+  .state i{width:.5rem;height:.5rem;border-radius:50%;background:currentColor;
+           box-shadow:0 0 10px currentColor}
+  .state[data-s=running]{color:var(--ok)} .state[data-s=running] i{animation:pulse 2s infinite}
+  .state[data-s=starting]{color:var(--warn)} .state[data-s=starting] i{animation:pulse .8s infinite}
+  .state[data-s=stopped]{color:var(--dim)}
+  .state[data-s=error]{color:var(--bad)}
+  @keyframes pulse{50%{opacity:.3}}
+
+  button{font:inherit;font-size:.88rem;font-weight:650;padding:.55rem 1.1rem;border-radius:8px;
+         border:1px solid var(--line-strong);background:transparent;color:var(--ink);cursor:pointer}
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  button.primary:hover:not(:disabled){filter:brightness(1.1);color:var(--on-accent)}
+
+  .cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(19rem,1fr));margin-top:1.5rem}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.2rem}
+  .card.wide{grid-column:1/-1}
+  label{display:block;margin-bottom:1rem}
+  label span{display:block;margin-bottom:.3rem;font-size:.82rem;color:var(--dim)}
+  select,input[type=number],textarea{width:100%;font:inherit;font-size:.88rem;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem}
+  textarea{min-height:11rem;font:.82rem/1.7 var(--mono);resize:vertical}
+  .row{display:flex;gap:.8rem;align-items:flex-end}
+  .row label{flex:1}
+  .hint{margin:0;font-size:.8rem;color:var(--dim)}
+  .hint.warn{color:var(--warn)}
+
+  .meter{height:.5rem;border-radius:999px;background:var(--surface-2);overflow:hidden;margin:.5rem 0 .4rem}
+  .meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .1s linear}
+  .meter i.hot{background:var(--bad)}
+  .meter i.quiet{background:var(--dim)}
+
+  .stat{display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--line);
+        font-size:.88rem}
+  .stat:last-child{border-bottom:0}
+  .stat b{font-weight:650}
+  .stat span{color:var(--dim);font-family:var(--mono);font-size:.82rem}
+
+  #qr{display:grid;place-items:center;padding:.8rem;background:#fff;border-radius:10px}
+  #qr svg{display:block;width:100%;height:auto;max-width:13rem}
+  .url{margin:.7rem 0 0;text-align:center;font:.85rem/1.5 var(--mono);word-break:break-all;color:var(--accent)}
+
+  #log{margin:0;padding:0;list-style:none;max-height:22rem;overflow-y:auto}
+  #log li{padding:.5rem 0;border-bottom:1px solid var(--line)}
+  #log .t{color:var(--dim);font:.7rem/1 var(--mono);letter-spacing:.08em}
+  #log .src{color:var(--dim);font-size:.85rem}
+  #log .out{font-size:1rem}
+  .empty{color:var(--dim);font-size:.85rem}
+
+  .toast{position:fixed;left:50%;bottom:1.5rem;transform:translate(-50%,2rem);opacity:0;
+         background:var(--surface-2);border:1px solid var(--line-strong);border-radius:999px;
+         padding:.6rem 1.1rem;font-size:.82rem;font-weight:650;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Sermon Translation</h1>
+  <span class="state" id="state" data-s="stopped"><i></i><span id="statetext">stopped</span></span>
+  <span class="grow"></span>
+  <button class="primary" id="startbtn">Start</button>
+  <button id="stopbtn">Stop</button>
+  <button id="restartbtn">Restart</button>
+</header>
+<p class="hint" id="detail"></p>
+
+<div class="cards">
+
+  <div class="card">
+    <h2>Microphone</h2>
+    <label>
+      <span>Input device</span>
+      <select id="device"></select>
+    </label>
+    <div class="meter"><i id="level"></i></div>
+    <p class="hint" id="levelhint">Speak into the mic — the bar should move.</p>
+  </div>
+
+  <div class="card">
+    <h2>Listeners</h2>
+    <div id="qr"></div>
+    <p class="url" id="url"></p>
+    <div class="stat"><b>Connected now</b><span id="listeners">0</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Translation quality</h2>
+    <label>
+      <span>Language model</span>
+      <select id="model">
+        <option value="mlx-community/Qwen3-4B-Instruct-2507-4bit">Qwen3 4B — 16 GB Macs</option>
+        <option value="mlx-community/Qwen3-8B-Instruct-4bit">Qwen3 8B — better, needs 24 GB</option>
+      </select>
+    </label>
+    <label>
+      <span>Voice</span>
+      <select id="tts">
+        <option value="qwen3">Qwen3-TTS — best sounding</option>
+        <option value="kokoro">Kokoro — faster, use if it falls behind</option>
+      </select>
+    </label>
+    <div class="row">
+      <label>
+        <span>Context (sentences)</span>
+        <input type="number" id="chat_size" min="0" max="8">
+      </label>
+      <label>
+        <span>Pause before translating (ms)</span>
+        <input type="number" id="min_silence_ms" min="32" max="1000" step="32">
+      </label>
+    </div>
+    <p class="hint" id="restarthint"></p>
+  </div>
+
+  <div class="card">
+    <h2>Glossary</h2>
+    <p class="hint">Your ministry names, your elders' names, the Bible version you quote.
+       Saved changes apply to the next sentence — no restart.</p>
+    <textarea id="glossary" spellcheck="false"></textarea>
+    <button id="savegloss" style="margin-top:.7rem">Save glossary</button>
+  </div>
+
+  <div class="card wide">
+    <h2>Live transcript</h2>
+    <ul id="log"><li class="empty">Nothing yet.</li></ul>
+  </div>
+
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const CFG = ["device", "model", "tts", "chat_size", "min_silence_ms"];
+let current = null;
+
+const toast = (msg) => {
+  $("toast").textContent = msg;
+  $("toast").classList.add("show");
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => $("toast").classList.remove("show"), 2200);
+};
+
+const post = (path, body) =>
+  fetch(path, { method: "POST", body: JSON.stringify(body || {}) }).then((r) => r.json());
+
+$("startbtn").onclick = () => post("/api/start");
+$("stopbtn").onclick = () => post("/api/stop");
+$("restartbtn").onclick = () => { post("/api/restart"); toast("Restarting — models take a minute"); };
+$("savegloss").onclick = () =>
+  post("/api/glossary", { text: $("glossary").value }).then(() => toast("Glossary saved"));
+
+CFG.forEach((key) => $(key).addEventListener("change", () => {
+  const el = $(key);
+  let value = el.value;
+  if (el.type === "number") value = Number(value);
+  if (key === "device") value = value === "" ? null : Number(value);
+  post("/api/config", { [key]: value }).then((r) => {
+    $("restarthint").textContent = r.restart_required
+      ? "Restart to apply — the new model has to load." : "";
+    $("restarthint").className = "hint" + (r.restart_required ? " warn" : "");
+    toast("Saved");
+  });
+}));
+
+fetch("/api/devices").then((r) => r.json()).then(({ devices, error }) => {
+  $("device").innerHTML = '<option value="">System default</option>' +
+    devices.map((d) => `<option value="${d.index}">${d.name} (${d.channels} ch)</option>`).join("");
+  if (current) $("device").value = current.config.device ?? "";
+  if (error) { $("levelhint").textContent = error; $("levelhint").className = "hint warn"; }
+});
+
+function applyStatus(s) {
+  const first = !current;
+  current = s;
+  $("state").dataset.s = s.state;
+  $("statetext").textContent = s.state;
+  $("detail").textContent = s.detail || "";
+  $("listeners").textContent = s.listeners;
+  $("url").textContent = s.url;
+
+  const pct = Math.min(100, s.level * 140);
+  $("level").style.width = pct + "%";
+  $("level").className = s.level > .92 ? "hot" : s.level < .02 ? "quiet" : "";
+  if (s.state === "running")
+    $("levelhint").textContent = s.level < .02
+      ? "No audio reaching the Mac — check the cable and the device above."
+      : s.level > .92 ? "Clipping — turn the send down at the desk." : "Audio looks good.";
+
+  $("startbtn").disabled = s.state === "running" || s.state === "starting";
+  $("stopbtn").disabled = s.state === "stopped";
+
+  // Don't fight the operator's cursor: only fill fields they aren't editing.
+  CFG.forEach((key) => {
+    if (document.activeElement === $(key)) return;
+    $(key).value = key === "device" ? (s.config.device ?? "") : s.config[key];
+  });
+  if (first || document.activeElement !== $("glossary")) $("glossary").value = s.glossary;
+  if (first) fetch("/qr.svg").then((r) => r.ok ? r.text() : "").then((svg) => {
+    if (svg) $("qr").innerHTML = svg; else $("qr").remove();
+  });
+}
+
+function addLine(line) {
+  const log = $("log");
+  log.querySelector(".empty")?.remove();
+  const li = document.createElement("li");
+  li.innerHTML = `<div class="t">${line.at} · ${line.kind === "src" ? "HEARD" : "TRANSLATED"}</div>`;
+  const p = document.createElement("div");
+  p.className = line.kind;
+  p.textContent = line.text;
+  li.appendChild(p);
+  log.appendChild(li);
+  while (log.children.length > 60) log.firstChild.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+const es = new EventSource("/api/events");
+es.addEventListener("status", (e) => applyStatus(JSON.parse(e.data)));
+es.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
+es.onerror = () => { $("state").dataset.s = "error"; $("statetext").textContent = "no console link"; };
+</script>
+</body>
+</html>

@@ -13,15 +13,6 @@
     <key>WorkingDirectory</key>
     <string>__DIR__</string>
 
-    <key>EnvironmentVariables</key>
-    <dict>
-        <!-- The two things anyone actually changes. -->
-        <key>AUDIO_DEVICE</key>
-        <string>Scarlett 2i2</string>
-        <key>MODEL</key>
-        <string>mlx-community/Qwen3-4B-Instruct-2507-4bit</string>
-    </dict>
-
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>

@@ -1,30 +1,54 @@
 #!/usr/bin/env python3
 """Sermon translator bridge.
 
-mic -> speech-to-speech realtime server (VAD/STT/LLM/TTS) -> ffmpeg mp3 -> LAN listeners.
+Owns the whole thing: starts the speech-to-speech pipeline, feeds it the mic,
+broadcasts the translated audio and subtitles to phones on the LAN, and serves
+an operator console at http://localhost:8000/admin
 
-Run `speech-to-speech serve` first, then this. Listeners open http://<lan-ip>:8000/
+    python3 bridge.py
 """
-import argparse, base64, contextlib, json, queue, socket, subprocess, sys, threading, time
+import argparse, array, base64, contextlib, json, queue, socket, subprocess, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-S2S_URL = "ws://127.0.0.1:8765/v1/realtime"
-HTTP_PORT = 8000
+HERE = Path(__file__).resolve().parent
+S2S_PORT, HTTP_PORT = 8765, 8000
 RATE, BLOCK = 16000, 320          # 20 ms of s16le mono
 MAX_LAG_S = 20                    # translation backlog before we start dropping
 MAX_QUEUED = 60                   # mp3 chunks buffered per listener (~10 s) before eviction
-GLOSSARY = Path("glossary.txt").read_text().strip() if Path("glossary.txt").exists() else ""
+LOAD_TIMEOUT_S = 900              # first run downloads ~8 GB before the port answers
 
-INSTRUCTIONS = f"""You are a simultaneous interpreter for a church sermon.
+CONFIG_PATH = HERE / "config.json"
+GLOSSARY_PATH = HERE / "glossary.txt"
+DEFAULTS = {
+    "device": None,                                              # mic; None = system default
+    "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+    "stt": "mlx-audio-whisper",
+    "tts": "qwen3",
+    "chat_size": 2,
+    "min_silence_ms": 64,
+}
+NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms"}   # device/glossary are live
+
+BASE_PROMPT = """You are a simultaneous interpreter for a church sermon.
 Translate every utterance between English and Chinese: English input -> Simplified Chinese
 output, Chinese input -> English output. Output ONLY the translation, nothing else: no
 greetings, no commentary, no quotes, no explanation of your reasoning. Preserve the
 speaker's first person voice and register. Keep Bible book/chapter/verse references and
-proper names exact. If an utterance is unintelligible, output nothing.
-{GLOSSARY}"""
+proper names exact. If an utterance is unintelligible, output nothing."""
 
-out_q = queue.Queue()             # translated PCM, chunked
+
+def load_config():
+    cfg = dict(DEFAULTS)
+    if CONFIG_PATH.exists():
+        cfg.update({k: v for k, v in json.loads(CONFIG_PATH.read_text()).items() if k in DEFAULTS})
+    return cfg
+
+
+def instructions():
+    """Rebuilt on every session.update, so glossary edits apply without a restart."""
+    glossary = GLOSSARY_PATH.read_text().strip() if GLOSSARY_PATH.exists() else ""
+    return BASE_PROMPT + ("\n" + glossary if glossary else "")
 
 
 class Fanout:
@@ -52,21 +76,28 @@ class Fanout:
             with self.lock:
                 self.qs.discard(q)
 
+    def count(self):
+        with self.lock:
+            return len(self.qs)
 
+
+out_q = queue.Queue()             # translated PCM, chunked
 audio = Fanout(MAX_QUEUED)        # mp3 chunks
 subs = Fanout(20)                 # subtitle lines
+events = Fanout(50)               # operator console updates
 recent = []                       # last few lines, so a phone joining mid-sermon sees context
 
 
-def mic_to_server(ws, device=None):
-    import sounddevice as sd
+def port_open(port):
+    with socket.socket() as s:
+        s.settimeout(.4)
+        return s.connect_ex(("127.0.0.1", port)) == 0
 
-    def cb(indata, frames, t, status):
-        ws.send(json.dumps({"type": "input_audio_buffer.append",
-                            "audio": base64.b64encode(bytes(indata)).decode()}))
-    with sd.RawInputStream(samplerate=RATE, channels=1, dtype="int16", device=device,
-                           blocksize=BLOCK * 4, callback=cb):
-        threading.Event().wait()
+
+def lan_ip():
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
 
 
 def subtitle(kind, text):
@@ -74,24 +105,165 @@ def subtitle(kind, text):
     if not (text := text.strip()):
         return
     print(("  " if kind == "src" else "  -> ") + text, flush=True)
-    line = json.dumps({"kind": kind, "text": text})
+    line = {"kind": kind, "text": text, "at": time.strftime("%H:%M:%S")}
     recent.append(line)
     del recent[:-8]
-    subs.publish(f"data: {line}\n\n".encode())
+    subs.publish(f"data: {json.dumps(line)}\n\n".encode())
+    events.publish(("line", line))
 
 
-def server_to_pcm(ws):
-    for msg in ws:
-        ev = json.loads(msg)
-        t = ev.get("type", "")
-        # GA calls it response.output_audio.delta; older builds response.audio.delta
-        if t.endswith("audio.delta") and "transcript" not in t:
-            out_q.put(base64.b64decode(ev["delta"]))
-        elif "input_audio_transcription" in t and t.endswith((".completed", ".done")):
-            subtitle("src", ev.get("transcript", ""))
-        elif t.endswith("audio_transcript.done"):
-            # text is ready before the audio it narrates, so subtitles run a little ahead
-            subtitle("out", ev.get("transcript", ""))
+class Pipeline:
+    """Supervises `speech-to-speech serve` and the WebSocket session against it."""
+
+    def __init__(self):
+        self.cfg = load_config()
+        self.state = "stopped"      # stopped | starting | running | error
+        self.detail = ""
+        self.proc = self.ws = self.mic = None
+        self.level = 0.0            # most recent mic peak, 0..1
+        self.lock = threading.Lock()
+
+    # ---------------------------------------------------------------- status
+    def status(self):
+        return {"state": self.state, "detail": self.detail, "config": self.cfg,
+                "listeners": audio.count(), "level": round(self.level, 3),
+                "glossary": GLOSSARY_PATH.read_text() if GLOSSARY_PATH.exists() else "",
+                "url": f"http://{lan_ip()}:{HTTP_PORT}/"}
+
+    def _set(self, state, detail=""):
+        self.state, self.detail = state, detail
+        print(f"[{state}] {detail}", flush=True)
+        events.publish(("status", self.status()))
+
+    # ----------------------------------------------------------- lifecycle
+    def start(self):
+        with self.lock:
+            if self.state in ("starting", "running"):
+                return
+            self._set("starting", "launching pipeline")
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        try:
+            if not port_open(S2S_PORT):
+                self.proc = subprocess.Popen(self._command(), cwd=HERE)
+                self._set("starting", "loading models (first run downloads ~8 GB)")
+                deadline = time.monotonic() + LOAD_TIMEOUT_S
+                while not port_open(S2S_PORT):
+                    if self.proc.poll() is not None:
+                        raise RuntimeError(f"pipeline exited with code {self.proc.returncode}")
+                    if time.monotonic() > deadline:
+                        raise RuntimeError("pipeline did not answer on :%d in time" % S2S_PORT)
+                    time.sleep(1)
+            else:
+                self._set("starting", "attaching to a pipeline already on :%d" % S2S_PORT)
+
+            from websockets.sync.client import connect
+            self.ws = connect(f"ws://127.0.0.1:{S2S_PORT}/v1/realtime", max_size=None)
+            self.apply_instructions()
+            self.open_mic()
+            threading.Thread(target=self._read_ws, daemon=True).start()
+            self._set("running", "translating")
+        except Exception as exc:
+            self._set("error", str(exc))
+            self.stop()
+
+    def _command(self):
+        c = self.cfg
+        return ["speech-to-speech", "serve", "--mac-optimal-settings",
+                "--stt", c["stt"], "--language", "auto", "--tts", c["tts"],
+                "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
+                "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1"]
+
+    def stop(self):
+        if self.mic:
+            with contextlib.suppress(Exception):
+                self.mic.close()
+            self.mic = None
+        if self.ws:
+            with contextlib.suppress(Exception):
+                self.ws.close()
+            self.ws = None
+        if self.proc:
+            self.proc.terminate()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                self.proc.wait(15)
+            if self.proc.poll() is None:
+                self.proc.kill()
+            self.proc = None
+        if self.state != "error":
+            self._set("stopped", "")
+
+    def restart(self):
+        self.stop()
+        self.start()
+
+    # -------------------------------------------------------------- session
+    def apply_instructions(self):
+        self.ws.send(json.dumps({"type": "session.update", "session": {
+            "type": "realtime", "instructions": instructions(),
+            "audio": {"input": {"turn_detection": {"type": "server_vad",
+                                                   "interrupt_response": False}}}}}))
+
+    def open_mic(self):
+        import sounddevice as sd
+        if self.mic:
+            with contextlib.suppress(Exception):
+                self.mic.close()
+
+        def cb(indata, frames, t, status):
+            raw = bytes(indata)
+            samples = array.array("h", raw)
+            self.level = max(abs(min(samples)), abs(max(samples))) / 32768 if samples else 0.0
+            with contextlib.suppress(Exception):
+                self.ws.send(json.dumps({"type": "input_audio_buffer.append",
+                                         "audio": base64.b64encode(raw).decode()}))
+
+        self.mic = sd.RawInputStream(samplerate=RATE, channels=1, dtype="int16",
+                                     device=self.cfg["device"], blocksize=BLOCK * 4, callback=cb)
+        self.mic.start()
+
+    def _read_ws(self):
+        try:
+            for msg in self.ws:
+                ev = json.loads(msg)
+                t = ev.get("type", "")
+                # GA calls it response.output_audio.delta; older builds response.audio.delta
+                if t.endswith("audio.delta") and "transcript" not in t:
+                    out_q.put(base64.b64decode(ev["delta"]))
+                elif "input_audio_transcription" in t and t.endswith((".completed", ".done")):
+                    subtitle("src", ev.get("transcript", ""))
+                elif t.endswith("audio_transcript.done"):
+                    # text is ready before the audio it narrates, so subtitles run a little ahead
+                    subtitle("out", ev.get("transcript", ""))
+        except Exception as exc:
+            if self.state == "running":
+                self._set("error", f"lost the pipeline: {exc}")
+
+    # ---------------------------------------------------------------- config
+    def update(self, patch):
+        """Returns True when the change needs a pipeline restart to take effect."""
+        changed = {k: v for k, v in patch.items() if k in DEFAULTS and v != self.cfg[k]}
+        self.cfg.update(changed)
+        CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
+        if "device" in changed and self.state == "running":
+            self.open_mic()
+        events.publish(("status", self.status()))
+        return bool(NEEDS_RESTART & set(changed))
+
+
+pipeline = Pipeline()
+
+
+def devices():
+    """A broken or missing PortAudio is a real macOS failure; say so instead of 500ing."""
+    try:
+        import sounddevice as sd
+        return {"devices": [{"index": i, "name": d["name"], "channels": d["max_input_channels"]}
+                            for i, d in enumerate(sd.query_devices())
+                            if d["max_input_channels"] > 0], "error": ""}
+    except Exception as exc:
+        return {"devices": [], "error": f"Cannot read audio devices: {exc}"}
 
 
 def pacer(stdin, stop=None):
@@ -102,7 +274,7 @@ def pacer(stdin, stop=None):
         while len(buf) < BLOCK * 2 and not out_q.empty():
             buf += out_q.get_nowait()
         # ponytail: drop oldest on backlog. A faster speaker than the TTS drifts forever
-        # otherwise. Upgrade path if this fires often: shrink --chat_size, faster TTS.
+        # otherwise. Upgrade path if this fires often: shrink chat_size, faster TTS.
         if out_q.qsize() * BLOCK * 2 > MAX_LAG_S * RATE * 2:
             print("!! backlog, dropping audio", flush=True)
             with out_q.mutex:
@@ -119,8 +291,48 @@ def fanout(stdout):
         audio.publish(chunk)
 
 
+def heartbeat():
+    """Keeps the console's meters moving without the pipeline having to push them."""
+    while True:
+        time.sleep(.5)
+        if events.count():
+            events.publish(("status", pipeline.status()))
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+
+    # ponytail: the console is localhost-only, so nobody on the church wifi can stop the
+    # broadcast. If an operator ever needs it from a tablet, add a token to the URL.
+    def local_only(self):
+        if self.client_address[0] not in ("127.0.0.1", "::1"):
+            self.send_error(403, "The console is only available on this Mac")
+            return False
+        return True
+
+    def send_json(self, obj, code=200):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_file(self, name, ctype):
+        body = (HERE / name).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    @staticmethod
+    def frame(item):
+        """Console events arrive as (name, payload); everything else is already bytes."""
+        if isinstance(item, tuple):
+            name, data = item
+            return f"event: {name}\ndata: {json.dumps(data)}\n\n".encode()
+        return item
 
     def stream(self, fanout_, content_type, backlog=()):
         self.send_response(200)
@@ -131,70 +343,97 @@ class Handler(BaseHTTPRequestHandler):
         with fanout_.subscribe() as q:
             try:
                 for item in backlog:
-                    self.wfile.write(item)
+                    self.wfile.write(self.frame(item))
                 while True:
                     try:
-                        self.wfile.write(q.get(timeout=15))
+                        self.wfile.write(self.frame(q.get(timeout=15)))
                     except queue.Empty:
-                        self.wfile.write(b":\n\n")   # keep a dozing phone's socket open
+                        self.wfile.write(b":\n\n")      # keep a dozing phone's socket open
             except Exception:
                 pass
 
     def do_GET(self):
-        if self.path.startswith("/stream.mp3"):
+        path = self.path.split("?")[0]
+        if path.startswith("/stream.mp3"):
             self.stream(audio, "audio/mpeg")
-        elif self.path == "/subs":
+        elif path == "/subs":
             self.stream(subs, "text/event-stream",
-                        [f"data: {l}\n\n".encode() for l in list(recent)])
-        else:
-            body = Path("index.html").read_bytes()
+                        [f"data: {json.dumps(l)}\n\n".encode() for l in list(recent)])
+        elif path == "/admin":
+            if self.local_only():
+                self.send_file("admin.html", "text/html; charset=utf-8")
+        elif path == "/api/events":
+            if self.local_only():
+                self.stream(events, "text/event-stream",
+                            [("status", pipeline.status())] + [("line", l) for l in list(recent)])
+        elif path == "/api/devices":
+            if self.local_only():
+                self.send_json(devices())
+        elif path == "/qr.svg":
+            try:
+                import segno
+                body = segno.make(pipeline.status()["url"]).svg_inline(scale=6).encode()
+            except ImportError:
+                return self.send_error(404, "pip install segno for a QR code")
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", "image/svg+xml")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        else:
+            self.send_file("index.html", "text/html; charset=utf-8")
+
+    def do_POST(self):
+        if not self.local_only():
+            return
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        data = json.loads(body) if body else {}
+        path = self.path.split("?")[0]
+        if path == "/api/start":
+            pipeline.start()
+        elif path == "/api/stop":
+            pipeline.stop()
+        elif path == "/api/restart":
+            threading.Thread(target=pipeline.restart, daemon=True).start()
+        elif path == "/api/config":
+            return self.send_json({"restart_required": pipeline.update(data)})
+        elif path == "/api/glossary":
+            GLOSSARY_PATH.write_text(data.get("text", ""))
+            if pipeline.state == "running":
+                pipeline.apply_instructions()          # applies without a restart
+        else:
+            return self.send_error(404)
+        self.send_json(pipeline.status())
 
     def log_message(self, *a):
         pass
 
 
-def lan_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
-    s.close()
-    return ip
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--device", help="input device name or index "
-                                     "(list them with: python3 -m sounddevice)")
+    ap.add_argument("--no-start", action="store_true",
+                    help="serve the console but wait for it to start the pipeline")
     args = ap.parse_args()
 
     ff = subprocess.Popen(
         ["ffmpeg", "-loglevel", "error", "-f", "s16le", "-ar", str(RATE), "-ac", "1",
          "-i", "pipe:0", "-c:a", "libmp3lame", "-b:a", "48k", "-f", "mp3", "pipe:1"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    from websockets.sync.client import connect
-    ws = connect(S2S_URL, max_size=None)
-    ws.send(json.dumps({"type": "session.update", "session": {
-        "type": "realtime", "instructions": INSTRUCTIONS,
-        "audio": {"input": {"turn_detection": {"type": "server_vad",
-                                               "interrupt_response": False}}}}}))
-
-    for fn, a in ((server_to_pcm, (ws,)), (mic_to_server, (ws, args.device)),
-                  (pacer, (ff.stdin,)), (fanout, (ff.stdout,))):
+    for fn, a in ((pacer, (ff.stdin,)), (fanout, (ff.stdout,)), (heartbeat, ())):
         threading.Thread(target=fn, args=a, daemon=True).start()
 
-    url = f"http://{lan_ip()}:{HTTP_PORT}/"
-    print(f"\n  Listeners: {url}\n")
-    try:
+    server = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
+    url = pipeline.status()["url"]
+    print(f"\n  Listeners: {url}\n  Console:   http://localhost:{HTTP_PORT}/admin\n")
+    with contextlib.suppress(ImportError):
         import segno
         segno.make(url).terminal(compact=True)
-    except ImportError:
-        print("  (pip install segno for a QR code here)")
-    ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler).serve_forever()
+    if not args.no_start:
+        pipeline.start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pipeline.stop()
 
 
 if __name__ == "__main__":
