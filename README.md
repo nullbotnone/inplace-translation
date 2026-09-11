@@ -51,14 +51,12 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install speech-to-speech segno      # segno is optional, only for the QR code
 ```
 
-**Keep the project out of Documents, Desktop and Downloads.** macOS protects those three
-folders, and an app made of a shell script has no run loop, so it cannot even show the
-permission prompt — the read simply fails with *"Operation not permitted"*. Your home folder,
-or anywhere outside those three, works with no permissions at all. The app checks this on
-launch and explains it rather than showing the raw error.
+**Prefer somewhere outside Documents, Desktop and Downloads.** macOS protects those three
+folders, so the first run there triggers a permission prompt for Terminal that somebody has to
+approve. Anywhere else in your home folder needs no permissions at all.
 
-If it is already in the wrong place, move the folder and rebuild the environment, since a
-virtualenv hard-codes its own path:
+To move an existing checkout, move the folder and rebuild the environment, since a virtualenv
+hard-codes its own path:
 
 ```bash
 mv ~/Documents/inplace-translation ~/inplace-translation && cd ~/inplace-translation
@@ -66,8 +64,8 @@ rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate
 pip install speech-to-speech segno      # quick: pip still has the wheels cached
 ```
 
-Granting the app Full Disk Access in System Settings → Privacy & Security works too, but
-moving the folder is less to explain to whoever runs it next.
+Approving the Terminal prompt works just as well; moving the folder simply means there is no
+prompt to explain to whoever runs it next.
 
 **Use Python 3.12, not whatever `python3` points at.** `misaki`, which Kokoro's text
 processing pulls in, publishes nothing for 3.13 or newer. On a 3.13+ venv pip cannot resolve
@@ -89,22 +87,18 @@ prompt never appears, grant it by hand in System Settings → Privacy & Security
 
 ## Run
 
-**Double-click `Sermon Translation.app`.** It starts everything and opens the console in your
-browser; there is no Terminal window and nothing to type. Quitting it from the Dock stops the
-translation and frees the memory the models were holding. Double-clicking it again while it is
-already running just brings the console back up.
+**Double-click `Start Translation.command` in Finder.** A Terminal window opens, everything
+starts, and the console appears in your browser on its own. Leave the window open; closing it
+stops the translation and frees the memory the models were holding. Nobody needs to type
+anything.
 
-Keep the app inside the project folder — it finds `start.sh` next to itself, and says so if
-you move it. Drag it to the Dock for a shortcut rather than to Applications.
+macOS will ask for the microphone the first time, and for folder access if the project sits
+somewhere protected. Both prompts come from Terminal, which can actually display them — an
+app bundle cannot, which is why this is a `.command` and not a `.app`.
 
-The first time, macOS may refuse it with *"cannot be opened because it is from an
-unidentified developer"* — that happens when the project arrived as a downloaded zip rather
-than a `git clone`. Right-click it once and choose **Open**, and it will not ask again. It
-will also ask for the microphone the first time; that prompt comes from the app, and it has
-to be allowed.
-
-Anything it prints goes to `sermon.log`, and a failed start shows a dialog with the last few
-lines.
+If the project arrived as a downloaded zip rather than a `git clone`, macOS may refuse it with
+*"cannot be opened because it is from an unidentified developer"*. Right-click the file once
+and choose **Open**, and it will not ask again.
 
 From a terminal, the same thing:
 

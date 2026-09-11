@@ -521,9 +521,11 @@ def main():
     for fn, a in ((pacer, (ff.stdin,)), (fanout, (ff.stdout,)), (heartbeat, ())):
         threading.Thread(target=fn, args=a, daemon=True).start()
 
-    # Default SIGTERM kills the interpreter outright, skipping the cleanup below and
-    # orphaning ffmpeg and the pipeline. launchd and the app bundle both send TERM.
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    # The default action for both of these kills the interpreter outright, skipping the
+    # cleanup below and orphaning ffmpeg and the pipeline. launchd sends TERM; closing the
+    # Terminal window the launcher opened sends HUP.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(0))
 
     server = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
     url = pipeline.status()["url"]

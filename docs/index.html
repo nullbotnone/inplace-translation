@@ -230,14 +230,14 @@ python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install speech-to-speech segno</code></pre>
 
     <p class="warn-note"
-       data-zh="别把项目放在「文稿」「桌面」或「下载」里。macOS 会保护这三个文件夹，而这种用脚本做的 App 没法弹出授权对话框，只会直接报 Operation not permitted。放在个人文件夹下就完全没这个问题。"
-       data-tw="別把專案放在「文件」「桌面」或「下載」裡。macOS 會保護這三個資料夾，而這種用腳本做的 App 沒辦法跳出授權對話框，只會直接報 Operation not permitted。放在個人資料夾下就完全沒這個問題。"
-       data-en="Keep the project out of Documents, Desktop and Downloads. macOS protects those three folders, and an app built from a shell script cannot show the permission prompt, so the read just fails with “Operation not permitted”. Anywhere else in your home folder works with no permissions at all."></p>
+       data-zh="尽量别把项目放在「文稿」「桌面」或「下载」里。macOS 会保护这三个文件夹，第一次运行会弹出授权框，要有人去点同意。放在个人文件夹下就完全不需要授权。"
+       data-tw="盡量別把專案放在「文件」「桌面」或「下載」裡。macOS 會保護這三個資料夾，第一次執行會跳出授權框，要有人去按同意。放在個人資料夾下就完全不需要授權。"
+       data-en="Prefer somewhere outside Documents, Desktop and Downloads. macOS protects those three folders, so the first run there raises a permission prompt somebody has to approve. Anywhere else in your home folder needs no permissions at all."></p>
 
     <p class="prose lead-in"
-       data-zh="装完这一次，以后每个主日就是双击「讲道翻译」这个 App。没有终端窗口，控制台自己在浏览器里打开，不用敲任何命令。从程序坞退出就停下来，模型占的内存也一起放掉。"
-       data-tw="裝完這一次，以後每個主日就是雙擊「講道翻譯」這個 App。沒有終端機視窗，控制台自己在瀏覽器裡打開，不用敲任何命令。從 Dock 結束就停下來，模型佔的記憶體也一起放掉。"
-       data-en="After that one setup, every Sunday is a double-click on the Sermon Translation app. No Terminal window, no typing: the console opens in the browser by itself. Quitting it from the Dock stops the translation and gives back the memory the models were holding."></p>
+       data-zh="装完这一次，以后每个主日就是在访达里双击 Start Translation.command。会开一个终端窗口，控制台自己在浏览器里打开，不用再敲任何命令。窗口关掉就停，模型占的内存也一起放掉。"
+       data-tw="裝完這一次，以後每個主日就是在 Finder 裡雙擊 Start Translation.command。會開一個終端機視窗，控制台自己在瀏覽器裡打開，不用再敲任何命令。視窗關掉就停，模型佔的記憶體也一起放掉。"
+       data-en="After that one setup, every Sunday is a double-click on Start Translation.command in Finder. A Terminal window opens, the console comes up in the browser by itself, and nobody types anything. Closing the window stops it and gives back the memory the models were holding."></p>
   </section>
 
   <section class="band">

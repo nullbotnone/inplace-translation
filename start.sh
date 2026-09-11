@@ -33,7 +33,7 @@ source .venv/bin/activate
 # `kill 0` is wrong here too - it would take our own parent down before it could report why.
 child=""
 cleanup() { [ -n "$child" ] && kill -TERM "$child" 2>/dev/null; }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT INT TERM HUP      # HUP is what closing the Terminal window sends
 
 caffeinate -i python3 bridge.py "$@" &
 child=$!

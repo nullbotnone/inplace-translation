@@ -1,5 +1,5 @@
 """Self-check: python3 test_bridge.py"""
-import json, queue, socket, tempfile, threading, time
+import json, queue, signal, socket, tempfile, threading, time
 from pathlib import Path
 
 import bridge
@@ -193,11 +193,11 @@ try:
         time.sleep(.25)
     else:
         raise AssertionError("the encoder never started")
-    proc.terminate()
+    proc.send_signal(signal.SIGHUP)      # what closing the Terminal window sends
     code = proc.wait(timeout=15)
     # 0 means the handler ran and the finally block cleaned up; -15 means Python was killed
     # where it stood, which is what orphans the pipeline subprocess.
-    assert code == 0, f"SIGTERM killed it outright (exit {code}); cleanup never ran"
+    assert code == 0, f"the signal killed it outright (exit {code}); cleanup never ran"
     time.sleep(1)
     assert not encoder(), "the encoder outlived the bridge"
 finally:
