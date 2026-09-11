@@ -99,7 +99,10 @@
   .url{margin:.7rem 0 0;text-align:center;font:.85rem/1.5 var(--mono);word-break:break-all;
        color:var(--accent)}
 
-  #log{margin:0;padding:0;list-style:none;flex:1;min-height:12rem;overflow-y:auto}
+  /* max-height is what makes it scroll: flex:1 with no upper bound just grows to fit
+     the content, so overflow-y never engages and the card gets taller all service. */
+  #log{margin:0;padding:0;list-style:none;flex:1;min-height:8rem;max-height:17rem;
+       overflow-y:auto;overscroll-behavior:contain}
   #log li{padding:.5rem 0;border-bottom:1px solid var(--line)}
   #log li:last-child{border-bottom:0}
   #log .t{color:var(--dim);font:.7rem/1 var(--mono);letter-spacing:.08em}
@@ -470,10 +473,12 @@ function addLine(line) {
   const body = document.createElement("div");
   body.className = line.kind;
   body.textContent = line.text;
+  // stay pinned to the newest line, unless the operator has scrolled up to read something
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   li.append(tag, body);
   log.appendChild(li);
-  while (log.children.length > 60) log.firstChild.remove();
-  log.scrollTop = log.scrollHeight;
+  while (log.children.length > 30) log.firstChild.remove();
+  if (atBottom) log.scrollTop = log.scrollHeight;
 }
 
 const es = new EventSource("/api/events");

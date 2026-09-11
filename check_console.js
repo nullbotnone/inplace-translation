@@ -19,10 +19,15 @@ function el(tag = "div") {
     className: "", placeholder: "", disabled: false, type: "",
     classList: { add() {}, remove() {}, contains: () => false },
     setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; },
-    appendChild(c) { this.children.push(c); return c; },
-    append(...c) { this.children.push(...c); },
+    appendChild(c) { c.parent = this; this.children.push(c); return c; },
+    append(...c) { c.forEach((x) => { x.parent = this; }); this.children.push(...c); },
     querySelector: () => null, querySelectorAll: () => [], closest: () => null,
-    remove() {}, focus() {}, setSelectionRange() {}, addEventListener() {},
+    remove() {
+      const kids = this.parent && this.parent.children;
+      if (kids) kids.splice(kids.indexOf(this), 1);
+    },
+    focus() {}, setSelectionRange() {}, addEventListener() {},
+    scrollHeight: 0, scrollTop: 0, clientHeight: 0,
   };
   let text = "";
   e.writes = 0;
@@ -30,6 +35,7 @@ function el(tag = "div") {
     get: () => text,
     set(v) { text = v; e.writes++; },
   });
+  Object.defineProperty(e, "firstChild", { get: () => e.children[0] ?? null });
   return e;
 }
 
@@ -86,6 +92,19 @@ for (const [name, data] of [["status", status], ["line", { kind: "out", text: "ç
   } catch (e) {
     errors.push(`on ${name}: ${e.message}`);
   }
+}
+
+// the transcript must stay bounded: it is on screen for a whole sermon
+for (let i = 0; i < 200; i++) {
+  try {
+    listeners.line({ data: JSON.stringify({ kind: "out", text: `line ${i}`, at: "10:00:00" }) });
+  } catch (e) {
+    errors.push(`on line ${i}: ${e.message}`);
+    break;
+  }
+}
+if (byId.log.children.length > 40) {
+  errors.push(`transcript grew to ${byId.log.children.length} lines; it never trims`);
 }
 
 // a repaint must not overwrite the glossary the operator is part-way through editing
