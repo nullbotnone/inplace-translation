@@ -81,6 +81,12 @@ The console is where everything gets configured, so you should not need this REA
 It reads 简 / 繁 / EN and has a day/night toggle in the corner, both remembered between
 sessions:
 
+- **Sermon languages** — what the preacher speaks, and what listeners hear. These are not the
+  简/繁/EN switcher in the corner, which only changes the console's own wording. The spoken
+  language sets what the recogniser listens for and needs a restart; the listeners' language
+  only rewrites the prompt, so it takes effect on the next sentence. Pick **Detect
+  automatically** only if the preacher genuinely switches mid-sermon — naming the language
+  outright gets better recognition on names and short phrases.
 - **Microphone** — pick the input from a list, and watch the level meter while someone talks
   into it. This is the failure everyone hits, and the meter turns it into a five-second check
   instead of a mystery. Switching device takes effect immediately.
@@ -136,6 +142,9 @@ All of this lives in the console; the notes below are why each one is there.
   `cp glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
   since it ends up full of real people's names. Keep it short — it is re-read on every
   utterance, so a long one costs latency on every sentence of the sermon.
+- **One direction at a time.** The console translates the sermon into one language. If you
+  need English→Chinese and Chinese→English simultaneously, run a second copy of the repo on
+  another port with the directions reversed, and hand out two QR codes.
 - **Language model** — 4B is the floor for sermon register. On a 24 GB+ Mac pick the 8B; the
   difference is visible. Watch for backlog warnings afterwards — a bigger model is a slower one.
 - **Context** — 2 sentences keeps pronouns and topic consistent without letting an hour of

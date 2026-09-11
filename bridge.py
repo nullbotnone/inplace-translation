@@ -22,33 +22,65 @@ CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
 DEFAULTS = {
     "device": None,                                              # mic; None = system default
+    "source": "en",                                              # what the preacher speaks
+    "target": "zh-Hans",                                         # what listeners hear
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
     "stt": "mlx-audio-whisper",
     "tts": "qwen3",
     "chat_size": 2,
     "min_silence_ms": 64,
 }
-NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms"}   # device/glossary are live
+NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source"}
+# device, target and the glossary apply live: the first reopens the mic, the other two only
+# change the prompt. "source" sets the recognition language, which is a CLI flag.
 
-BASE_PROMPT = """You are a simultaneous interpreter for a church sermon.
-Translate every utterance between English and Chinese: English input -> Simplified Chinese
-output, Chinese input -> English output. Output ONLY the translation, nothing else: no
-greetings, no commentary, no quotes, no explanation of your reasoning. Preserve the
-speaker's first person voice and register. Keep Bible book/chapter/verse references and
-proper names exact. If an utterance is unintelligible, output nothing."""
+SPOKEN = {"en": "English", "zh": "Chinese", "auto": "whatever language the speaker uses"}
+TARGETS = {"en": "English", "zh-Hans": "Simplified Chinese (简体)",
+           "zh-Hant": "Traditional Chinese (繁體)"}
+STT_LANG = {"en": "en", "zh": "zh", "auto": "auto"}
+
+# The console posts these, and a hand-edited config.json can hold anything. An unknown
+# value here would reach a CLI flag or a dict lookup, so reject it at the door.
+CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"}}
+BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000)}
+
+
+def valid(key, value):
+    if key in CHOICES:
+        return value in CHOICES[key]
+    if key in BOUNDS:
+        lo, hi = BOUNDS[key]
+        return isinstance(value, int) and not isinstance(value, bool) and lo <= value <= hi
+    if key == "device":
+        return value is None or (isinstance(value, int) and value >= 0)
+    return isinstance(value, str) and value.strip() != ""
+
+def base_prompt(cfg):
+    target = TARGETS[cfg["target"]]
+    return f"""You are a simultaneous interpreter for a church sermon.
+The speaker is talking in {SPOKEN[cfg["source"]]}. Translate every utterance into {target}.
+Output ONLY the {target} translation, nothing else: no greetings, no commentary, no quotes,
+no explanation of your reasoning. Preserve the speaker's first person voice and register.
+Keep Bible book/chapter/verse references and proper names exact.
+If an utterance is unintelligible, or is already in {target}, output nothing."""
 
 
 def load_config():
     cfg = dict(DEFAULTS)
     if CONFIG_PATH.exists():
-        cfg.update({k: v for k, v in json.loads(CONFIG_PATH.read_text()).items() if k in DEFAULTS})
+        saved = json.loads(CONFIG_PATH.read_text())
+        for key, value in saved.items():
+            if key in DEFAULTS and valid(key, value):
+                cfg[key] = value
+            elif key in DEFAULTS:
+                print(f"!! ignoring {key}={value!r} in config.json", flush=True)
     return cfg
 
 
-def instructions():
-    """Rebuilt on every session.update, so glossary edits apply without a restart."""
+def instructions(cfg):
+    """Rebuilt on every session.update, so glossary and target edits apply without a restart."""
     glossary = GLOSSARY_PATH.read_text().strip() if GLOSSARY_PATH.exists() else ""
-    return BASE_PROMPT + ("\n" + glossary if glossary else "")
+    return base_prompt(cfg) + ("\n" + glossary if glossary else "")
 
 
 class Fanout:
@@ -171,7 +203,7 @@ class Pipeline:
     def _command(self):
         c = self.cfg
         return ["speech-to-speech", "serve", "--mac-optimal-settings",
-                "--stt", c["stt"], "--language", "auto", "--tts", c["tts"],
+                "--stt", c["stt"], "--language", STT_LANG[c["source"]], "--tts", c["tts"],
                 "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
                 "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1"]
 
@@ -201,7 +233,7 @@ class Pipeline:
     # -------------------------------------------------------------- session
     def apply_instructions(self):
         self.ws.send(json.dumps({"type": "session.update", "session": {
-            "type": "realtime", "instructions": instructions(),
+            "type": "realtime", "instructions": instructions(self.cfg),
             "audio": {"input": {"turn_detection": {"type": "server_vad",
                                                    "interrupt_response": False}}}}}))
 
@@ -243,11 +275,14 @@ class Pipeline:
     # ---------------------------------------------------------------- config
     def update(self, patch):
         """Returns True when the change needs a pipeline restart to take effect."""
-        changed = {k: v for k, v in patch.items() if k in DEFAULTS and v != self.cfg[k]}
+        changed = {k: v for k, v in patch.items()
+                   if k in DEFAULTS and v != self.cfg[k] and valid(k, v)}
         self.cfg.update(changed)
         CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
         if "device" in changed and self.state == "running":
             self.open_mic()
+        if "target" in changed and self.state == "running":
+            self.apply_instructions()
         events.publish(("status", self.status()))
         return bool(NEEDS_RESTART & set(changed))
 

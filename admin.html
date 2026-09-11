@@ -113,7 +113,8 @@
   <h1 data-zh="讲道翻译控制台" data-tw="講道翻譯控制台" data-en="Sermon Translation"></h1>
   <span class="state" id="state" data-s="stopped"><i></i><span id="statetext"></span></span>
   <span class="grow"></span>
-  <div class="seg" role="group" aria-label="Language" id="langseg">
+  <div class="seg" role="group" id="langseg"
+       data-zh="控制台语言" data-tw="控制台語言" data-en="Console language">
     <button type="button" data-lang="zh">简</button>
     <button type="button" data-lang="tw">繁</button>
     <button type="button" data-lang="en">EN</button>
@@ -133,6 +134,31 @@
 </header>
 
 <div class="cards">
+
+  <div class="card">
+    <h2 data-zh="讲道语言" data-tw="講道語言" data-en="Sermon languages"></h2>
+    <label>
+      <span data-zh="讲员说的语言" data-tw="講員說的語言" data-en="The preacher speaks"></span>
+      <select id="source">
+        <option value="en" data-zh="英文" data-tw="英文" data-en="English"></option>
+        <option value="zh" data-zh="中文" data-tw="中文" data-en="Chinese"></option>
+        <option value="auto" data-zh="自动判断（讲员会换语言时用）"
+                data-tw="自動判斷（講員會換語言時用）"
+                data-en="Detect automatically — if they switch"></option>
+      </select>
+    </label>
+    <label>
+      <span data-zh="听众听到的语言" data-tw="聽眾聽到的語言" data-en="Listeners hear"></span>
+      <select id="target">
+        <option value="zh-Hans" data-zh="简体中文" data-tw="簡體中文"
+                data-en="Chinese — Simplified 简体"></option>
+        <option value="zh-Hant" data-zh="繁体中文" data-tw="繁體中文"
+                data-en="Chinese — Traditional 繁體"></option>
+        <option value="en" data-zh="英文" data-tw="英文" data-en="English"></option>
+      </select>
+    </label>
+    <p class="hint" id="langhint"></p>
+  </div>
 
   <div class="card">
     <h2 data-zh="麦克风" data-tw="麥克風" data-en="Microphone"></h2>
@@ -214,7 +240,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const CFG = ["device", "model", "tts", "chat_size", "min_silence_ms"];
+const CFG = ["source", "target", "device", "model", "tts", "chat_size", "min_silence_ms"];
 const LANGS = ["zh", "tw", "en"];
 const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 
@@ -225,12 +251,14 @@ const STR = {
         restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
         micprompt:"对着麦克风说话，这条会动。", micgood:"声音正常。",
         micsilent:"没有声音进来 — 检查线和上面选的设备。", micclip:"爆音了 — 把音控台的输出调小。",
+        direction:"{a} 讲道 → 听众听到 {b}。", samelang:"讲员说的和听众听到的是同一种语言，不会有翻译。",
         heard:"听到", translated:"翻译" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
         sysdefault:"系統預設", saved:"已儲存", glossarysaved:"詞表已儲存",
         restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
         micprompt:"對著麥克風說話，這條會動。", micgood:"聲音正常。",
         micsilent:"沒有聲音進來 — 檢查線和上面選的裝置。", micclip:"爆音了 — 把音控台的輸出調小。",
+        direction:"{a} 講道 → 聽眾聽到 {b}。", samelang:"講員說的和聽眾聽到的是同一種語言，不會有翻譯。",
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
         nolink:"no console link", sysdefault:"System default", saved:"Saved",
@@ -239,6 +267,7 @@ const STR = {
         micprompt:"Speak into the mic — the bar should move.", micgood:"Audio looks good.",
         micsilent:"No audio reaching the Mac — check the cable and the device above.",
         micclip:"Clipping — turn the send down at the desk.",
+        direction:"Preached in {a}, heard as {b}.", samelang:"Source and target are the same language — nothing will be translated.",
         heard:"HEARD", translated:"TRANSLATED" },
 };
 
@@ -268,6 +297,14 @@ let linkLost = false;
 let qrUrl = null;            // the URL the QR on screen actually encodes
 const t = (key) => STR[lang][key];
 
+/* Spoken/heard language names, per console language. */
+const LANGNAME = {
+  zh: { en:"英文", zh:"中文", auto:"自动判断", "zh-Hans":"简体中文", "zh-Hant":"繁体中文" },
+  tw: { en:"英文", zh:"中文", auto:"自動判斷", "zh-Hans":"簡體中文", "zh-Hant":"繁體中文" },
+  en: { en:"English", zh:"Chinese", auto:"auto-detect", "zh-Hans":"Simplified Chinese",
+        "zh-Hant":"Traditional Chinese" },
+};
+
 function applyTheme() {
   if (theme === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme;
@@ -289,6 +326,14 @@ function render() {
     $("device").innerHTML = `<option value="">${t("sysdefault")}</option>` +
       deviceList.map((d) => `<option value="${d.index}">${d.name} (${d.channels} ch)</option>`).join("");
     $("device").value = keep;
+  }
+  if (s) {
+    const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
+    const same = s.config.source === "en" ? s.config.target === "en"
+               : s.config.source === "zh" ? s.config.target.startsWith("zh") : false;
+    $("langhint").textContent = same ? t("samelang")
+      : t("direction").replace("{a}", from).replace("{b}", into);
+    $("langhint").className = "hint" + (same ? " warn" : "");
   }
   $("restarthint").textContent = restartPending ? t("restartneeded") : "";
   $("restarthint").className = "hint" + (restartPending ? " warn" : "");
