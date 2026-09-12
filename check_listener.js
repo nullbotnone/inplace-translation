@@ -21,7 +21,11 @@ function el(tag = "div") {
       if (!this.parent) return;
       this.parent.children.splice(this.parent.children.indexOf(this), 1);
     },
-    querySelector(sel) { return sel === ".empty" ? this.children.find((kid) => kid.className === "empty") : null; },
+    querySelector(sel) {
+      if (sel === ".empty") return this.children.find((kid) => kid.className === "empty") ?? null;
+      const kind = sel.match(/^\[data-kind="(src|out)"\]$/)?.[1];
+      return kind ? this.children.find((kid) => kid.dataset.kind === kind) ?? null : null;
+    },
     play() { this.paused = false; return Promise.resolve(); },
     pause() { this.paused = true; },
   };
@@ -53,7 +57,9 @@ if (ids.log.children[0].children[1].textContent !== "<b>神爱世人</b>")
 
 for (let i = 0; i < 60; i++)
   eventSource.onmessage({ data: JSON.stringify({ kind: i % 2 ? "src" : "out", text: `line ${i}`, at: `10:32:${i}` }) });
-if (ids.log.children.length > 40) throw new Error(`subtitle history grew to ${ids.log.children.length}`);
+if (ids.log.children.length !== 2) throw new Error(`expected only the latest heard/translation, got ${ids.log.children.length}`);
+if (ids.log.children.map((kid) => kid.dataset.kind).sort().join(",") !== "out,src")
+  throw new Error("the latest heard/translation pair was not retained");
 
 ids.b.onclick();
 if (ids.b.dataset.mode !== "loading") throw new Error("play button did not show its loading state");
@@ -64,4 +70,4 @@ if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could
 
 eventSource.onerror();
 if (ids.connection.dataset.state !== "offline") throw new Error("disconnect was not surfaced");
-console.log("ok: listener UI connects, deduplicates and bounds subtitles, escapes text, and toggles audio");
+console.log("ok: listener UI connects, keeps the latest heard/translation, escapes text, and toggles audio");
