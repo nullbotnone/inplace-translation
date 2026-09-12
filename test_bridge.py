@@ -189,16 +189,22 @@ assert ocmd[ocmd.index("--responses_api_base_url") + 1] == \
     f"http://127.0.0.1:{bridge.HTTP_PORT}/omni/v1", "omni must go through our proxy"
 assert "--language" not in ocmd, "there is no recogniser to give a language to"
 
-# the audio model will not take the cascade's prompt: prose rules make it transcribe instead
-# of translate, and the Speaker:/You: example makes it emit a chat turn marker out loud
+# the audio model barely tolerates prose. Rules make it transcribe the English or emit a bare
+# <|im_start|>, the Speaker:/You: example makes it read a chat turn marker out loud, and the
+# book list made it read the list itself aloud instead of translating short utterances.
 op = bridge.instructions({**bridge.DEFAULTS, "engine": "omni", "target": "zh"})
 assert "Speaker:" not in op and "You:" not in op, "the example leaks <|im_start|> into the voice"
 assert "Translate, never reply" not in op, "prose rules make this model transcribe"
+assert "Genesis" not in op, "the book list gets read out loud by this model"
 assert op.rstrip().endswith("Output only the Chinese translation."), "the imperative must come last"
-assert "John = 约翰福音" in op, "the book list is what keeps the names right"
-# and the glossary still reaches it, because that is how a church sets its house style
+
+# the glossary is how a church sets its house style, so it still reaches the model -- with the
+# instruction repeated on both sides of it, which is what keeps prose from taking over
 bridge.GLOSSARY_PATH.write_text("Grace Chapel -> 恩典堂")
-assert "恩典堂" in bridge.instructions({**bridge.DEFAULTS, "engine": "omni", "target": "zh"})
+withgloss = bridge.instructions({**bridge.DEFAULTS, "engine": "omni", "target": "zh"})
+assert "恩典堂" in withgloss, "house style never reached the audio model"
+assert withgloss.startswith("Translate into Chinese.") and \
+    withgloss.rstrip().endswith("Output only the Chinese translation."), "glossary not bracketed"
 bridge.GLOSSARY_PATH.unlink()
 # the cascade keeps its own prompt, example and all
 cp = bridge.instructions({**bridge.DEFAULTS, "source": "en", "target": "zh"})

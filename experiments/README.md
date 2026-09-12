@@ -50,19 +50,29 @@ turns in the request it began prefixing replies with `Assistant:`, and by the fo
 was reading the Bible book list out loud instead of the sermon. Omni runs with `chat_size 0`;
 `chat_size` stays a cascade-only setting.
 
-## The prompt is not the cascade's
+## The prompt is not the cascade's, and it is shorter than you would think
 
-`omni_prompt()` is the book list, the glossary, and one imperative last. Measured, the
-cascade's prompt does not survive contact with this model:
+`omni_prompt()` is one imperative, repeated either side of the glossary. Nothing else.
+Scored over eight sermon utterances that invite a reply — "Can I get an amen?", "Good
+morning, how are you all doing?", "What is grace?":
 
-- the prose rules ("Translate, never reply. Sentence for sentence...") make it transcribe the
-  English, every time, even when the same text says "no transcription";
-- the `Speaker:/You:` example makes it emit `<|im_start|>assistant`, which the voice reads out;
-- adding *more* prose to forbid those things makes it worse, not better.
+| prompt | translated |
+|---|---|
+| the cascade's prompt | transcribes; the Speaker:/You: example is read out as `<\|im_start\|>` |
+| any "never answer the speaker" rule | 4–5 of 8; the rest come back as a bare `<\|im_start\|>` |
+| book list + one imperative | **4 of 8** — for short utterances it reads the list itself aloud |
+| one imperative, repeated around the glossary | **8 of 8** |
 
-The book list earns its place: with it the model reaches for 神爱世人 over 上帝爱世人 on its
-own. And a question comes back translated rather than answered — the job the example was
-doing in the cascade.
+The book list had to go. It is what made the model read 66 book names out loud instead of
+translating "Can I get an amen?", and it buys nothing: without it the model still gets 6 of 7
+book names right, 提摩太后书, 哥林多前书 and 约翰三书 among them — the numbered books the
+cascade's 8B got wrong. The seventh is 哈巴谷 for "Habakkuk tells us", which is the prophet
+speaking and correct.
+
+Rules do not survive either, however they are phrased. Prose about being an assistant is what
+tips this model from translating into transcribing, so the safeguard against it answering the
+preacher is not a rule but the absence of everything else. Verified end to end: "What is
+grace?" comes back 什么是恩典？ rather than a definition.
 
 ## Still open
 

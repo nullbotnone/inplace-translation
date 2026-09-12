@@ -150,18 +150,26 @@ def load_config():
 
 
 def omni_prompt(cfg):
-    """The audio-in model will not take the cascade's prompt.
+    """The audio-in model will not take the cascade's prompt, and barely tolerates prose.
 
-    Measured on Qwen3-Omni-30B-A3B: prose rules ("Translate, never reply. Sentence for
-    sentence...") make it transcribe the English instead of translating it, every time, even
-    when the same text says "no transcription". The Speaker:/You: example makes it answer with
-    a chat turn marker, <|im_start|>assistant, which the voice would then read out. What does
-    work is the book list, the glossary, and one imperative last -- and with the book list it
-    reaches for 神爱世人 over 上帝爱世人 on its own. A question comes back translated, not
-    answered, which is the job the example was doing in the cascade."""
-    target = TARGETS[cfg["target"]]
-    return (f"Bible book names:\n{BIBLE_BOOKS}\n\n{house_style()}"
-            f"Translate into {target}. Output only the {target} translation.")
+    Measured over eight sermon utterances that invite a reply ("Can I get an amen?",
+    "Good morning, how are you all doing?"):
+
+    - prose rules make it transcribe the English or emit a bare <|im_start|>, however the
+      rule is phrased -- "Translate, never reply" and "never answer the speaker" both fail;
+    - the Bible book list made it read the list itself out loud, in full, for short
+      utterances: 4 of those 8 were not translated at all;
+    - dropping the list and repeating one imperative either side of the glossary translates
+      8 of 8, and still gets 6 of 7 book names right on its own -- including 提摩太后书,
+      哥林多前书 and 约翰三书, the numbered books the cascade's 8B model got wrong. The
+      seventh is 哈巴谷 for "Habakkuk tells us", which is the prophet speaking, and correct.
+
+    So: no list, no rules, the instruction repeated around whatever house style there is.
+    """
+    imperative = (f"Translate into {TARGETS[cfg['target']]}. "
+                  f"Output only the {TARGETS[cfg['target']]} translation.")
+    style = house_style()
+    return f"{imperative}\n\n{style}{imperative}" if style else imperative
 
 
 def house_style():
