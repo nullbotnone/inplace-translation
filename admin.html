@@ -124,7 +124,9 @@
   textarea{min-height:9rem;flex:1;font:.82rem/1.7 var(--mono);resize:vertical}
   .row{display:flex;gap:.8rem;align-items:flex-end}
   .row label{flex:1}
-  .row .narrow{flex:0 1 12rem}          /* a voice name needs far less room than an engine */
+  /* One third of the row, gaps taken out: the same width as the three boxes below it, so
+     the voice lines up with the voice buffer rather than sitting at some width of its own. */
+  .row .narrow{flex:0 0 calc((100% - 1.6rem) / 3)}
   .hint{margin:0;font-size:.8rem;color:var(--dim)}
   .hint.warn{color:var(--warn)}
 
