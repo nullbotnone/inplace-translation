@@ -9,7 +9,7 @@
 <meta name="description" content="在教会 Wi-Fi 上实时翻译讲道：英文 ↔ 中文，语音与字幕，全部在本地运行。" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="讲道翻译 · Sermon Translation" />
-<meta property="og:description" content="访客扫码即可听到自己语言的讲道。不用装 App，不上云，声音不出教会。" />
+<meta property="og:description" content="访客扫码即可听到自己语言的讲道。无需安装 App，不经云端，声音不离开教会。" />
 <meta property="og:url" content="https://slashai.app/inplace-translation/" />
 <meta property="og:site_name" content="slashai.app" />
 <link rel="stylesheet" href="styles.css" />
@@ -52,16 +52,16 @@
           data-tw="教會 Wi-Fi 上的講道翻譯"
           data-en="Sermon translation on your church wifi"></h1>
       <p class="hero-sub"
-         data-zh="访客扫一下二维码，就能听到自己语言的讲道，还有实时字幕。整套系统跑在会堂后排的一台 Mac 上。不用装 App，不上云，声音不出教会。"
-         data-tw="訪客掃一下 QR Code，就能聽到自己語言的講道，還有即時字幕。整套系統跑在會堂後排的一台 Mac 上。不用裝 App，不上雲，聲音不出教會。"
-         data-en="A visitor scans a QR code and hears the sermon in their own language, with subtitles. It runs on one Mac at the back of the room. No app, no cloud, and no audio leaves the building."></p>
+         data-zh="访客扫描二维码，即可听到自己语言的讲道，并同时看到实时字幕。整套系统运行在会堂后排的一台 Mac 上。访客的手机不需安装任何程序，过程中不调用外部服务，声音也不会离开教会。"
+         data-tw="訪客掃描 QR Code，即可聽到自己語言的講道，並同時看到即時字幕。整套系統執行在會堂後排的一台 Mac 上。訪客的手機不需安裝任何程式，過程中不呼叫外部服務，聲音也不會離開教會。"
+         data-en="A visitor scans a QR code and hears the sermon in their own language, with subtitles alongside it. The whole system runs on one Mac at the back of the room. Nothing is installed on the visitor's phone, no outside service is called, and no audio leaves the building."></p>
       <div class="hero-actions">
         <a class="button" href="https://github.com/nullbotnone/inplace-translation" target="_blank" rel="noopener">
           <span data-zh="在 GitHub 上查看" data-tw="在 GitHub 上查看" data-en="View on GitHub"></span>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6" /></svg>
         </a>
         <a class="text-link" href="#setup">
-          <span data-zh="怎么装" data-tw="怎麼裝" data-en="How to set it up"></span>
+          <span data-zh="安装说明" data-tw="安裝說明" data-en="Setup instructions"></span>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6" /></svg>
         </a>
       </div>
@@ -97,11 +97,11 @@
     <div class="band-head">
       <div>
         <p class="kicker"><b>01</b> / <span data-zh="工作原理" data-tw="工作原理" data-en="How it works"></span></p>
-        <h2 data-zh="一台 Mac，整个流程" data-tw="一台 Mac，整個流程" data-en="One Mac, the whole chain"></h2>
+        <h2 data-zh="整条流程都在一台 Mac 上" data-tw="整條流程都在一台 Mac 上" data-en="The whole chain on one Mac"></h2>
       </div>
-      <p data-zh="音控台把讲员的声音送进 Mac。系统按句子切分，转成文字，本地翻译，再用本地的语音念出来，最后当成普通的 MP3 广播出去——任何手机浏览器都能收听。还有第二种引擎，把转文字这一步整个去掉：整句音频直接送进一个听得见的模型。它快一点，但要 64 GB 的 Mac，而且还在实验阶段。"
-         data-tw="音控台把講員的聲音送進 Mac。系統按句子切分，轉成文字，本地翻譯，再用本地的語音念出來，最後當成普通的 MP3 廣播出去——任何手機瀏覽器都能收聽。還有第二種引擎，把轉文字這一步整個去掉：整句音訊直接送進一個聽得見的模型。它快一點，但要 64 GB 的 Mac，而且還在實驗階段。"
-         data-en="The sound desk feeds the Mac. Voice detection splits the preacher into sentences, Whisper transcribes each one, a local model translates it, and a local voice speaks it. The result goes out as an ordinary MP3 stream any phone browser can play. A second engine drops the transcription step entirely — the sentence's audio goes straight into a model that hears — which is faster, but wants a 64 GB Mac and is still experimental."></p>
+      <p data-zh="音控台把讲员的声音送入 Mac。系统按句子切分，转写成文字，在本地翻译，再由本地的语音读出，最后以普通的 MP3 流广播出去，任何手机浏览器都能收听。另有一种引擎去掉了转写这一步，整句音频直接送入一个能听的模型。它更快，但需要 64 GB 的 Mac，目前仍属实验性质。"
+         data-tw="音控台把講員的聲音送入 Mac。系統按句子切分，轉寫成文字，在本地翻譯，再由本地的語音讀出，最後以普通的 MP3 串流廣播出去，任何手機瀏覽器都能收聽。另有一種引擎去掉了轉寫這一步，整句音訊直接送入一個能聽的模型。它更快，但需要 64 GB 的 Mac，目前仍屬實驗性質。"
+         data-en="The sound desk feeds the Mac. Voice detection divides the preacher into sentences, Whisper transcribes each one, a local model translates it, and a local voice speaks the translation. The result leaves the Mac as an ordinary MP3 stream that any phone browser can play. A second engine removes the transcription step and sends the sentence's audio directly into a model that hears it. That engine is faster, requires a 64 GB Mac, and remains experimental."></p>
     </div>
 
     <div class="stage">
@@ -170,41 +170,41 @@
     <div class="band-head">
       <div>
         <p class="kicker"><b>02</b> / <span data-zh="设计取舍" data-tw="設計取捨" data-en="Design choices"></span></p>
-        <h2 data-zh="为什么这样做" data-tw="為什麼這樣做" data-en="Why it's built this way"></h2>
+        <h2 data-zh="为什么这样设计" data-tw="為什麼這樣設計" data-en="Why it is built this way"></h2>
       </div>
-      <p data-zh="每一条都是为了让主日早上少出一件事。"
-         data-tw="每一條都是為了讓主日早上少出一件事。"
-         data-en="Every one of these exists to remove something that can go wrong on a Sunday morning."></p>
+      <p data-zh="每一项决定都是为了减少主日早上可能出错的环节。"
+         data-tw="每一項決定都是為了減少主日早上可能出錯的環節。"
+         data-en="Each of these decisions removes something that can go wrong on a Sunday morning."></p>
     </div>
 
     <div class="features">
       <div class="feature">
         <p class="kicker">A</p>
-        <h3 data-zh="不用装 App" data-tw="不用裝 App" data-en="No app, no accounts"></h3>
-        <p data-zh="扫码，按播放。就是一个网页和一个音频标签，访客拿什么手机来都能用。"
-           data-tw="掃碼，按播放。就是一個網頁和一個音訊標籤，訪客拿什麼手機來都能用。"
-           data-en="Scan, press play. It is a web page and an audio tag, so it works on whatever phone a visitor walks in with."></p>
+        <h3 data-zh="无需安装 App" data-tw="無需安裝 App" data-en="No app and no accounts"></h3>
+        <p data-zh="听众扫码后按下播放。页面只是普通网页加一个音频元素，访客带来的任何手机都能使用。"
+           data-tw="聽眾掃碼後按下播放。頁面只是普通網頁加一個音訊元素，訪客帶來的任何手機都能使用。"
+           data-en="The listener scans the code and presses play. The page is ordinary HTML with an audio element, so it works on any phone a visitor brings."></p>
       </div>
       <div class="feature">
         <p class="kicker">B</p>
-        <h3 data-zh="声音不出教会" data-tw="聲音不出教會" data-en="Audio never leaves"></h3>
-        <p data-zh="识别、翻译、合成语音全在那台 Mac 上跑。没有 API key，没有按分钟计费，也没有人把你会众的声音存在别人的服务器上。"
-           data-tw="辨識、翻譯、合成語音全在那台 Mac 上跑。沒有 API key，沒有按分鐘計費，也沒有人把你會眾的聲音存在別人的伺服器上。"
-           data-en="Recognition, translation and the synthesised voice all run on the Mac. No API keys, no per-minute billing, and no recording of your congregation on someone else's server."></p>
+        <h3 data-zh="声音不离开教会" data-tw="聲音不離開教會" data-en="The audio stays in the building"></h3>
+        <p data-zh="识别、翻译与语音合成都在这台 Mac 上运行。不需要 API key，没有按分钟计费，也不会有会众的录音留在别人的服务器上。"
+           data-tw="辨識、翻譯與語音合成都在這台 Mac 上執行。不需要 API key，沒有按分鐘計費，也不會有會眾的錄音留在別人的伺服器上。"
+           data-en="Recognition, translation and speech synthesis all run on the Mac. There are no API keys, no per-minute charges, and no recording of your congregation on anyone else's server."></p>
       </div>
       <div class="feature">
         <p class="kicker">C</p>
-        <h3 data-zh="字幕和语音一起" data-tw="字幕和語音一起" data-en="Subtitles as well as voice"></h3>
-        <p data-zh="同一条流程也产出文字，所以页面上有实时字幕。听障的弟兄姊妹用得上，读比听快的人也用得上。"
-           data-tw="同一條流程也產出文字，所以頁面上有即時字幕。聽障的弟兄姊妹用得上，讀比聽快的人也用得上。"
-           data-en="The same pipeline produces text, so the page shows live subtitles. Useful for deaf members, and for anyone who reads a language faster than they hear it."></p>
+        <h3 data-zh="字幕与语音并行" data-tw="字幕與語音並行" data-en="Subtitles as well as voice"></h3>
+        <p data-zh="同一条流程也产出文字，因此页面上同时有实时字幕。听障的会友可以使用，读得比听得快的人同样可以。"
+           data-tw="同一條流程也產出文字，因此頁面上同時有即時字幕。聽障的會友可以使用，讀得比聽得快的人同樣可以。"
+           data-en="The same pipeline produces text, so the page also shows live subtitles. They serve deaf members, and anyone who reads a language faster than they hear it."></p>
       </div>
       <div class="feature">
         <p class="kicker">D</p>
-        <h3 data-zh="词表你自己定" data-tw="詞表你自己定" data-en="A glossary you control"></h3>
-        <p data-zh="写上你们的事工名称、长老的名字、你们引用的圣经译本。在控制台里直接改，下一句就生效，不用重启。和合本 66 卷书名已经在提示词里了，不用你写。"
-           data-tw="寫上你們的事工名稱、長老的名字、你們引用的聖經譯本。在控制台裡直接改，下一句就生效，不用重啟。和合本 66 卷書名已經在提示詞裡了，不用你寫。"
-           data-en="It pins your ministry names, your elders' names, and the Bible translation you quote. Edit it in the console and it applies to the very next sentence, no restart. The 66 Chinese book names are already in the prompt, so you need not list them."></p>
+        <h3 data-zh="由你维护的词表" data-tw="由你維護的詞表" data-en="A glossary you control"></h3>
+        <p data-zh="词表里写你们的事工名称、长老姓名，以及你们引用的圣经译本。它在控制台中编辑，下一句即生效，无需重启。和合本 66 卷书名已包含在提示词中，不必另行列出。"
+           data-tw="詞表裡寫你們的事工名稱、長老姓名，以及你們引用的聖經譯本。它在控制台中編輯，下一句即生效，無需重啟。和合本 66 卷書名已包含在提示詞中，不必另行列出。"
+           data-en="The glossary holds your ministry names, your elders' names, and the Bible translation you quote. It is edited in the console and applies to the next sentence without a restart. The 66 Chinese book names are already in the prompt and need not be listed."></p>
       </div>
     </div>
   </section>
@@ -213,11 +213,11 @@
     <div class="band-head">
       <div>
         <p class="kicker"><b>03</b> / <span data-zh="安装" data-tw="安裝" data-en="Setup"></span></p>
-        <h2 data-zh="一小时内就能装好" data-tw="一小時內就能裝好" data-en="Under an hour"></h2>
+        <h2 data-zh="一小时内完成安装" data-tw="一小時內完成安裝" data-en="Setup takes under an hour"></h2>
       </div>
-      <p data-zh="大部分时间是在等模型下载，要敲的命令五分钟就完事。装好这一次以后，主日早上就是双击一下，其余的设置都在浏览器里点——不用有人去开终端。"
-         data-tw="大部分時間是在等模型下載，要敲的命令五分鐘就完事。裝好這一次以後，主日早上就是雙擊一下，其餘的設定都在瀏覽器裡點——不用有人去開終端機。"
-         data-en="Most of that is waiting for the models to download; the typing is five minutes. After that one setup, Sunday morning is a double-click and everything else is set from a page in the browser, so nobody has to open a terminal."></p>
+      <p data-zh="其中大部分时间用于下载模型，需要输入的命令约五分钟即可完成。安装一次之后，主日早上只需双击启动，其余设置都在浏览器页面中完成，不需要任何人打开终端。"
+         data-tw="其中大部分時間用於下載模型，需要輸入的命令約五分鐘即可完成。安裝一次之後，主日早上只需雙擊啟動，其餘設定都在瀏覽器頁面中完成，不需要任何人打開終端機。"
+         data-en="Most of that time is spent downloading models. The commands themselves take about five minutes. After this one setup, Sunday morning requires a double-click, and everything else is configured from a page in the browser, so nobody needs to open a terminal."></p>
     </div>
 
     <ul class="req">
@@ -236,67 +236,67 @@ python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install speech-to-speech segno</code></pre>
 
     <p class="warn-note"
-       data-zh="尽量别把项目放在「文稿」「桌面」或「下载」里。macOS 会保护这三个文件夹，第一次运行会弹出授权框，要有人去点同意。放在个人文件夹下就完全不需要授权。"
-       data-tw="盡量別把專案放在「文件」「桌面」或「下載」裡。macOS 會保護這三個資料夾，第一次執行會跳出授權框，要有人去按同意。放在個人資料夾下就完全不需要授權。"
-       data-en="Prefer somewhere outside Documents, Desktop and Downloads. macOS protects those three folders, so the first run there raises a permission prompt somebody has to approve. Anywhere else in your home folder needs no permissions at all."></p>
+       data-zh="请把项目放在「文稿」「桌面」「下载」之外的位置。macOS 对这三个文件夹另有保护，在其中首次运行会弹出授权提示，需要有人确认。放在个人文件夹的其他位置则完全不需要授权。"
+       data-tw="請把專案放在「文件」「桌面」「下載」之外的位置。macOS 對這三個資料夾另有保護，在其中首次執行會跳出授權提示，需要有人確認。放在個人資料夾的其他位置則完全不需要授權。"
+       data-en="Choose a location outside Documents, Desktop and Downloads. macOS protects those three folders, so a first run inside them raises a permission prompt that somebody has to approve. Anywhere else in your home folder requires no permission at all."></p>
 
     <p class="prose lead-in"
-       data-zh="装完这一次，以后每个主日就是在访达里双击 Start Translation.command。会开一个终端窗口，控制台自己在浏览器里打开，不用再敲任何命令。窗口关掉就停，模型占的内存也一起放掉。"
-       data-tw="裝完這一次，以後每個主日就是在 Finder 裡雙擊 Start Translation.command。會開一個終端機視窗，控制台自己在瀏覽器裡打開，不用再敲任何命令。視窗關掉就停，模型佔的記憶體也一起放掉。"
-                data-en="After that one setup, every Sunday is a double-click on Start Translation.command in Finder. A Terminal window opens, the console comes up in the browser by itself, and nobody types anything. Closing the window stops it and gives back the memory the models were holding."></p>
+       data-zh="安装完成后，此后每个主日只需在访达中双击 Start Translation.command。终端窗口会打开，控制台自行在浏览器中出现，不必再输入任何命令。关闭窗口即停止翻译，模型占用的内存也随之释放。"
+       data-tw="安裝完成後，此後每個主日只需在 Finder 中雙擊 Start Translation.command。終端機視窗會打開，控制台自行在瀏覽器中出現，不必再輸入任何命令。關閉視窗即停止翻譯，模型佔用的記憶體也隨之釋放。"
+       data-en="After this one setup, each Sunday begins with a double-click on Start Translation.command in Finder. A Terminal window opens and the console appears in the browser on its own, with nothing to type. Closing the window stops the translation and releases the memory the models were holding."></p>
 
     <p class="prose"
-       data-zh="想让它开机自己起来，README 里有一个 LaunchAgent。实验性的音频直入引擎也在那里：它要另建一个虚拟环境、再下 36 GB 模型，除非你有 64 GB 的 Mac 并且想试，否则跳过就好。"
-       data-tw="想讓它開機自己起來，README 裡有一個 LaunchAgent。實驗性的音訊直入引擎也在那裡：它要另建一個虛擬環境、再下載 36 GB 模型，除非你有 64 GB 的 Mac 並且想試，否則跳過就好。"
-       data-en="If you would rather it came up by itself, the README has a LaunchAgent. The experimental audio-in engine is there too: it needs a second virtualenv and another 36 GB of model, so skip it unless you have a 64 GB Mac and want to try it."></p>
+       data-zh="若希望系统登录后自行启动，README 中提供了一个 LaunchAgent。实验性的音频直入引擎也记在那里，它需要另建一个虚拟环境，并再下载 36 GB 模型。除非你有 64 GB 的 Mac 并打算试用，否则可以先不安装。"
+       data-tw="若希望系統登入後自行啟動，README 中提供了一個 LaunchAgent。實驗性的音訊直入引擎也記在那裡，它需要另建一個虛擬環境，並再下載 36 GB 模型。除非你有 64 GB 的 Mac 並打算試用，否則可以先不安裝。"
+       data-en="If you would rather the system started by itself, the README describes a LaunchAgent. It also covers the experimental audio-in engine, which needs a second virtualenv and a further 36 GB of model. Leave that engine aside unless you have a 64 GB Mac and wish to test it."></p>
   </section>
 
   <section class="band">
     <div class="band-head">
       <div>
         <p class="kicker"><b>04</b> / <span data-zh="限制" data-tw="限制" data-en="Limits"></span></p>
-        <h2 data-zh="它做不到什么" data-tw="它做不到什麼" data-en="What it is not"></h2>
+        <h2 data-zh="它做不到的事" data-tw="它做不到的事" data-en="What it is not"></h2>
       </div>
-      <p data-zh="这一段比功能列表重要。请照实告诉你的会众。"
-         data-tw="這一段比功能列表重要。請照實告訴你的會眾。"
-         data-en="This matters more than the feature list. Be straight with your congregation about it."></p>
+      <p data-zh="这一节比功能列表更重要。请如实告知会众系统的局限。"
+         data-tw="這一節比功能列表更重要。請如實告知會眾系統的侷限。"
+         data-en="This section matters more than the feature list. Tell your congregation plainly what the system cannot do."></p>
     </div>
 
     <ul class="limits">
       <li>
         <span class="kicker">01</span>
         <div>
-          <b data-zh="比讲员慢一秒左右，再加上手机" data-tw="比講員慢一秒左右，再加上手機" data-en="About a second behind, plus the phone"></b>
-          <p data-zh="讲员不停，就不会开始翻译；停下来之后，识别、翻译、语音、语音缓冲一层层加上去。在录音上量过：从最后一个字到第一声译出的话，级联约一秒，音频直入的引擎 0.4–0.7 秒。手机自己的 MP3 缓冲还要另外再加。讲道够用，问答就别想了。"
-             data-tw="講員不停，就不會開始翻譯；停下來之後，辨識、翻譯、語音、語音緩衝一層層加上去。在錄音上量過：從最後一個字到第一聲譯出的話，級聯約一秒，音訊直入的引擎 0.4–0.7 秒。手機自己的 MP3 緩衝還要另外再加。講道夠用，問答就別想了。"
-             data-en="Nothing is translated until the preacher pauses, and then recognition, translation, the voice and the voice buffer all stack up. Measured on a recording, last speech to first audio out: about 1 s on the cascade, 0.4–0.7 s on the audio-in engine. The phone's own MP3 buffer adds more on top. Fine for preaching. Useless for question and answer."></p>
+          <b data-zh="比讲员慢约一秒，再加上手机的延迟" data-tw="比講員慢約一秒，再加上手機的延遲" data-en="About a second behind the preacher, plus the phone"></b>
+          <p data-zh="讲员停顿之前不会开始翻译。此后识别、翻译、语音合成与语音缓冲逐层累加。在录音上测得，从最后一个字到第一声译出的语音，级联约一秒，音频直入引擎为 0.4 至 0.7 秒。手机自身的 MP3 缓冲还要另外计入。用于讲道足够，用于问答则不可行。"
+             data-tw="講員停頓之前不會開始翻譯。此後辨識、翻譯、語音合成與語音緩衝逐層累加。在錄音上測得，從最後一個字到第一聲譯出的語音，級聯約一秒，音訊直入引擎為 0.4 至 0.7 秒。手機自身的 MP3 緩衝還要另外計入。用於講道足夠，用於問答則不可行。"
+             data-en="Nothing is translated until the preacher pauses. Recognition, translation, the voice and the voice buffer then add up to about 1 s on the cascade and 0.4 to 0.7 s on the audio-in engine, measured on a recording from the last speech to the first audio out. The phone's own MP3 buffer adds more on top. That is adequate for preaching and unusable for question and answer."></p>
         </div>
       </li>
       <li>
         <span class="kicker">02</span>
         <div>
           <b data-zh="字幕比语音先到" data-tw="字幕比語音先到" data-en="Subtitles arrive before the voice"></b>
-          <p data-zh="模型一写完，文字就有了；语音还要合成、还要缓冲，所以字幕会快上一两秒。没有任何东西去对齐它们——先看到字、后听到声，本来就是这样。"
-             data-tw="模型一寫完，文字就有了；語音還要合成、還要緩衝，所以字幕會快上一兩秒。沒有任何東西去對齊它們——先看到字、後聽到聲，本來就是這樣。"
-             data-en="The text exists the moment the model finishes; the voice still has to be synthesised and buffered, so the subtitles run a second or two ahead. Nothing lines them up. Reading ahead of the voice is the intended behaviour, not a bug."></p>
+          <p data-zh="模型一写完，文字便已存在，而语音仍需合成与缓冲，因此字幕会提前一两秒。系统不会将两者对齐，文字先于语音出现是预期的行为。"
+             data-tw="模型一寫完，文字便已存在，而語音仍需合成與緩衝，因此字幕會提前一兩秒。系統不會將兩者對齊，文字先於語音出現是預期的行為。"
+             data-en="The text exists as soon as the model finishes, while the voice still has to be synthesised and buffered, so the subtitles run a second or two ahead. Nothing aligns them. Reading ahead of the voice is the intended behaviour."></p>
         </div>
       </li>
       <li>
         <span class="kicker">03</span>
         <div>
           <b data-zh="它会翻错" data-tw="它會翻錯" data-en="It will mistranslate"></b>
-          <p data-zh="小到能在笔记本上跑的模型，在神学词汇上会出人意料地出错。它是给本来什么都听不懂的访客的帮助，不是讲道的正式记录。"
-             data-tw="小到能在筆電上跑的模型，在神學詞彙上會出人意料地出錯。它是給本來什麼都聽不懂的訪客的幫助，不是講道的正式記錄。"
-             data-en="A model small enough to run on a laptop gets theology wrong in interesting ways. Treat it as help for a visitor who would otherwise understand nothing, not as the sermon of record."></p>
+          <p data-zh="小到能在笔记本电脑上运行的模型，在神学词汇上会出现难以预料的错误。它是给原本完全听不懂的访客的帮助，不能当作讲道的正式记录。"
+             data-tw="小到能在筆記型電腦上執行的模型，在神學詞彙上會出現難以預料的錯誤。它是給原本完全聽不懂的訪客的幫助，不能當作講道的正式記錄。"
+             data-en="A model small enough to run on a laptop makes errors in theological vocabulary that are difficult to anticipate. Treat it as help for a visitor who would otherwise understand nothing. It cannot serve as the sermon of record."></p>
         </div>
       </li>
       <li>
         <span class="kicker">04</span>
         <div>
           <b data-zh="讲员不停顿就会越拖越远" data-tw="講員不停頓就會越拖越遠" data-en="A preacher who never pauses will drift"></b>
-          <p data-zh="没有停顿就不会开始翻译，一整段连着讲的话会被整块攒着：量过 18 秒不停的讲话，第一个译出的词到第 20 秒才到听众耳朵里。正常讲道会在句子之间停顿，代价大约一秒。积压超过二十秒，它会丢掉音频跳回现场——听众听到的是一个断口，而不是无止境的延迟。"
-             data-tw="沒有停頓就不會開始翻譯，一整段連著講的話會被整塊攢著：量過 18 秒不停的講話，第一個譯出的詞到第 20 秒才到聽眾耳朵裡。正常講道會在句子之間停頓，代價大約一秒。積壓超過二十秒，它會丟掉音訊跳回現場——聽眾聽到的是一個斷口，而不是無止境的延遲。"
-             data-en="Nothing is translated until a pause, so an unbroken run of speech is held whole: on 18 s of continuous speech the first translated word reached the listener at 20 s. Normal preaching pauses between sentences and costs about a second. Past twenty seconds of backlog it drops audio and resyncs to live, so listeners hear a gap rather than an ever-growing delay."></p>
+          <p data-zh="没有停顿就不会开始翻译，一整段连续的讲话会被整块保留。在 18 秒不间断的讲话上测得，第一个译出的词到第 20 秒才传到听众。正常讲道会在句子之间停顿，代价约为一秒。积压超过二十秒时，系统会丢弃音频并重新同步到现场，听众听到的是一处断口，延迟不会持续累积。"
+             data-tw="沒有停頓就不會開始翻譯，一整段連續的講話會被整塊保留。在 18 秒不間斷的講話上測得，第一個譯出的詞到第 20 秒才傳到聽眾。正常講道會在句子之間停頓，代價約為一秒。積壓超過二十秒時，系統會丟棄音訊並重新同步到現場，聽眾聽到的是一處斷口，延遲不會持續累積。"
+             data-en="Nothing is translated until a pause, so an unbroken run of speech is held whole. On 18 s of continuous speech the first translated word reached the listener at 20 s. Normal preaching pauses between sentences and costs about a second. Past twenty seconds of backlog the system drops audio and resyncs to live, so listeners hear a gap and the delay does not keep growing."></p>
         </div>
       </li>
     </ul>
@@ -308,19 +308,19 @@ pip install speech-to-speech segno</code></pre>
         <p class="kicker"><b>05</b> / <span data-zh="技术细节" data-tw="技術細節" data-en="Under the hood"></span></p>
         <h2 data-zh="用了什么" data-tw="用了什麼" data-en="What it runs on"></h2>
       </div>
-      <p data-zh="全部开源，全部本地。"
-         data-tw="全部開源，全部本地。"
-         data-en="All open source, all local."></p>
+      <p data-zh="全部开源，全部在本地运行。"
+         data-tw="全部開源，全部在本地執行。"
+         data-en="All of it is open source, and all of it runs locally."></p>
     </div>
 
     <table class="spec">
       <tr><td>Pipeline</td><td><a href="https://github.com/huggingface/speech-to-speech" target="_blank" rel="noopener">huggingface/speech-to-speech</a></td></tr>
-      <tr><td data-zh="引擎" data-tw="引擎" data-en="Engines"></td><td data-zh="「识别 → 翻译 → 朗读」的级联，或者把音频直接送进模型的实验引擎" data-tw="「辨識 → 翻譯 → 朗讀」的級聯，或者把音訊直接送進模型的實驗引擎" data-en="The recognise → translate → speak cascade, or the experimental engine that feeds the audio straight in"></td></tr>
+      <tr><td data-zh="引擎" data-tw="引擎" data-en="Engines"></td><td data-zh="「识别 → 翻译 → 朗读」的级联，或将音频直接送入模型的实验引擎" data-tw="「辨識 → 翻譯 → 朗讀」的級聯，或將音訊直接送入模型的實驗引擎" data-en="The recognise, translate and speak cascade, or the experimental engine that sends the audio directly into the model"></td></tr>
       <tr><td data-zh="语音识别" data-tw="語音辨識" data-en="Recognition"></td><td data-zh="Whisper · MLX，仅级联" data-tw="Whisper · MLX，僅級聯" data-en="Whisper · MLX, cascade only"></td></tr>
       <tr><td data-zh="翻译" data-tw="翻譯" data-en="Translation"></td><td data-zh="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地运行" data-tw="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地執行" data-en="Qwen3 4B, 8B or Qwen3.6 35B-A3B, quantised, running locally"></td></tr>
-      <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，一个模型同时听和译；要 64 GB，还没在真实聚会里跑过" data-tw="Qwen3-Omni 30B-A3B，一個模型同時聽和譯；要 64 GB，還沒在真實聚會裡跑過" data-en="Qwen3-Omni 30B-A3B — one model both hears and translates; needs 64 GB and has never yet run a live service"></td></tr>
-      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Qwen3-TTS，需要更快时用 Kokoro" data-tw="Qwen3-TTS，需要更快時用 Kokoro" data-en="Qwen3-TTS, or Kokoro when you need more speed"></td></tr>
-      <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, fanned out by Python's standard-library HTTP server"></td></tr>
+      <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，由一个模型同时听取与翻译；需要 64 GB，尚未在真实聚会中使用过" data-tw="Qwen3-Omni 30B-A3B，由一個模型同時聽取與翻譯；需要 64 GB，尚未在真實聚會中使用過" data-en="Qwen3-Omni 30B-A3B. One model both hears and translates. It needs 64 GB and has not yet run a live service"></td></tr>
+      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Qwen3-TTS；需要更高速度时改用 Kokoro" data-tw="Qwen3-TTS；需要更高速度時改用 Kokoro" data-en="Qwen3-TTS, or Kokoro when more speed is needed"></td></tr>
+      <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉成 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, distributed by Python's standard-library HTTP server"></td></tr>
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>
   </section>
@@ -331,26 +331,26 @@ pip install speech-to-speech segno</code></pre>
         <p class="kicker"><b>06</b> / <span data-zh="磁盘空间" data-tw="磁碟空間" data-en="Disk space"></span></p>
         <h2 data-zh="模型存在哪里" data-tw="模型存在哪裡" data-en="Where the models live"></h2>
       </div>
-      <p data-zh="第一次运行会下载大约 6.6 GB，放在你的用户目录下，不在项目文件夹里。把仓库删掉并不会把这些腾出来。在控制台里换翻译模型，第一次选也会下载：8B 是 4.3 GB，35B 是 35 GB，音频直入的模型 36 GB，而且都不会替换掉已经下好的。"
-         data-tw="第一次執行會下載大約 6.6 GB，放在你的使用者目錄下，不在專案資料夾裡。把倉庫刪掉並不會把這些騰出來。在主控台裡換翻譯模型，第一次選也會下載：8B 是 4.3 GB，35B 是 35 GB，音訊直入的模型 36 GB，而且都不會替換掉已經下好的。"
-         data-en="The first run downloads about 6.6 GB into your home directory, not into the project folder. Deleting the repo does not reclaim any of it. Switching the translator in the console downloads that one too, the first time you pick it: the 8B is 4.3 GB, the 35B is 35 GB and the audio-in model is 36 GB, and none of them replaces what is already there."></p>
+      <p data-zh="第一次运行会下载约 6.6 GB，存放在用户目录而非项目文件夹，因此删除仓库并不会释放这些空间。在控制台中更换翻译模型时，首次选择也会下载该模型。8B 为 4.3 GB，35B 为 35 GB，音频直入的模型为 36 GB，且都不会替换已有的模型。"
+         data-tw="第一次執行會下載約 6.6 GB，存放在使用者目錄而非專案資料夾，因此刪除倉庫並不會釋放這些空間。在控制台中更換翻譯模型時，首次選擇也會下載該模型。8B 為 4.3 GB，35B 為 35 GB，音訊直入的模型為 36 GB，且都不會替換已有的模型。"
+         data-en="The first run downloads about 6.6 GB into your home directory rather than into the project folder, so deleting the repository reclaims none of it. Switching the translator in the console downloads that model the first time it is selected. The 8B is 4.3 GB, the 35B is 35 GB and the audio-in model is 36 GB, and none of them replaces what is already stored."></p>
     </div>
 
     <table class="spec">
       <tr><td>~/.cache/huggingface/hub</td>
-          <td data-zh="识别、翻译、语音三个模型，约 6.6 GB，外加你换过的翻译模型"
-              data-tw="辨識、翻譯、語音三個模型，約 6.6 GB，外加你換過的翻譯模型"
-              data-en="The recognition, translation and voice models — about 6.6 GB, plus any translator you switched to"></td></tr>
+          <td data-zh="识别、翻译、语音三个模型，约 6.6 GB，以及你另行选用的翻译模型"
+              data-tw="辨識、翻譯、語音三個模型，約 6.6 GB，以及你另行選用的翻譯模型"
+              data-en="The recognition, translation and voice models, about 6.6 GB, plus any translator you have selected"></td></tr>
       <tr><td>~/.cache/torch/hub</td>
-          <td data-zh="Silero 语音活动检测，几 MB"
-              data-tw="Silero 語音活動偵測，幾 MB"
-              data-en="Silero voice activity detection — a few MB"></td></tr>
+          <td data-zh="Silero 语音活动检测，数 MB"
+              data-tw="Silero 語音活動偵測，數 MB"
+              data-en="Silero voice activity detection, a few MB"></td></tr>
     </table>
 
     <p class="prose lead-in"
-       data-zh="要清掉的话，先激活这个项目的环境，再按名字删——只删下面这几个："
-       data-tw="要清掉的話，先啟用這個專案的環境，再按名字刪——只刪下面這幾個："
-       data-en="To clear them, activate this project's environment and remove them by name:"></p>
+       data-zh="要清除它们，请先激活本项目的环境，再按名称逐个删除。"
+       data-tw="要清除它們，請先啟用本專案的環境，再按名稱逐個刪除。"
+       data-en="To clear them, activate this project's environment and remove them by name."></p>
 
 <pre><code>source .venv/bin/activate
 hf cache ls                    <span class="c"># what is cached, and how big</span>
@@ -368,23 +368,23 @@ hf cache rm model/mlx-community/Qwen3-8B-4bit \
 hf cache prune                 <span class="c"># half-finished downloads</span></code></pre>
 
     <p class="warn-note"
-       data-zh="不要直接 rm -rf ~/.cache/huggingface。这个目录是这台 Mac 上所有 Hugging Face 工具共用的，里面很可能还有你别的项目的模型。先跑 hf cache ls 看一眼。加 --dry-run 可以先预览要删什么。"
-       data-tw="不要直接 rm -rf ~/.cache/huggingface。這個目錄是這台 Mac 上所有 Hugging Face 工具共用的，裡面很可能還有你其他專案的模型。先跑 hf cache ls 看一眼。加 --dry-run 可以先預覽要刪什麼。"
-       data-en="Do not simply rm -rf ~/.cache/huggingface. That directory is shared by every Hugging Face tool on the Mac and very likely holds models belonging to your other work. Run hf cache ls first, and add --dry-run to preview what a removal would take."></p>
+       data-zh="请勿直接删除整个 ~/.cache/huggingface。这台 Mac 上所有 Hugging Face 工具共用该目录，其中很可能还有你其他工作的模型。请先运行 hf cache ls 查看，并可加上 --dry-run 预览将要删除的内容。"
+       data-tw="請勿直接刪除整個 ~/.cache/huggingface。這台 Mac 上所有 Hugging Face 工具共用該目錄，其中很可能還有你其他工作的模型。請先執行 hf cache ls 查看，並可加上 --dry-run 預覽將要刪除的內容。"
+       data-en="Do not remove ~/.cache/huggingface wholesale. That directory is shared by every Hugging Face tool on the Mac and very likely holds models belonging to your other work. Run hf cache ls first, and add --dry-run to preview what a removal would take."></p>
 
     <p class="prose"
-       data-zh="删掉之后下次启动会重新下载，控制台会一直显示“启动中”，直到下完为止。"
-       data-tw="刪掉之後下次啟動會重新下載，控制台會一直顯示「啟動中」，直到下完為止。"
-       data-en="Once removed, the next start downloads them again, and the console sits on “starting” until it finishes."></p>
+       data-zh="删除之后，下次启动会重新下载，在下载完成之前控制台会一直显示“启动中”。"
+       data-tw="刪除之後，下次啟動會重新下載，在下載完成之前控制台會一直顯示「啟動中」。"
+       data-en="Once they are removed, the next start downloads them again, and the console remains on “starting” until the download completes."></p>
   </section>
 
 </main>
 
 <footer>
   <a class="footer-brand" href="/">slashai.app</a>
-  <p data-zh="为一间真的需要它的教会而造。如果你在别处用上了，或者它以 README 没写到的方式坏了，欢迎来开 issue。"
-     data-tw="為一間真的需要它的教會而造。如果你在別處用上了，或者它以 README 沒寫到的方式壞了，歡迎來開 issue。"
-     data-en="Built for a church that needed it. If you run it somewhere, or it breaks in a way the README does not cover, open an issue."></p>
+  <p data-zh="为一间确实需要它的教会而建。如果你在别处使用，或遇到 README 未涵盖的故障，欢迎提交 issue。"
+     data-tw="為一間確實需要它的教會而建。如果你在別處使用，或遇到 README 未涵蓋的故障，歡迎提交 issue。"
+     data-en="Built for a church that needed it. If you run it elsewhere, or it fails in a way the README does not describe, please open an issue."></p>
   <p class="foot-links"><a href="https://github.com/nullbotnone/inplace-translation" target="_blank" rel="noopener">GitHub ↗</a></p>
 </footer>
 
