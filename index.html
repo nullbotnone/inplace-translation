@@ -29,8 +29,8 @@
   .connection[data-state="live"] i{box-shadow:0 0 12px currentColor;animation:pulse 2s infinite}
   .connection[data-state="offline"]{color:var(--bad)}
   main{height:100dvh;padding:4.35rem 0 6.25rem}
-  #log{height:100%;margin:0;padding:clamp(1.5rem,5vw,3rem) 0;display:flex;flex-direction:column;
-       justify-content:flex-end;list-style:none;overflow:hidden}
+  #log{height:100%;margin:0;padding:clamp(1.5rem,5vw,3rem) 0;list-style:none;overflow-y:auto;
+       overscroll-behavior:contain;scrollbar-color:var(--line) transparent}
   #log li{animation:arrive .28s ease-out}#log li+li{margin-top:clamp(1.5rem,4vw,2.4rem)}
   .line-meta{display:flex;align-items:center;gap:.55rem;margin-bottom:.45rem;color:var(--dim);
              font-size:.68rem;font-weight:760;letter-spacing:.09em;text-transform:uppercase}
@@ -57,8 +57,7 @@
   #b[data-mode="loading"]{cursor:progress}#b[data-mode="loading"] .play-icon{width:1rem;height:1rem;
     border:2px solid #08151c55;border-top-color:#08151c;border-radius:50%;animation:spin .75s linear infinite}
   #b[data-mode="loading"] .play-icon::before{content:""}.play-icon::before{content:"▶";font-size:.9rem}
-  .help{min-width:0}.help strong{display:block;font-size:.85rem}.help span{display:block;margin-top:.15rem;
-    color:var(--dim);font-size:.75rem;line-height:1.45}.headphones{margin-left:auto;color:var(--accent-2);
+  .help{min-width:0}.help strong{display:block;font-size:.85rem}.headphones{margin-left:auto;color:var(--accent-2);
     font-size:.78rem;font-weight:720;white-space:nowrap}audio{display:none}
   @keyframes pulse{50%{opacity:.4}}@keyframes spin{to{transform:rotate(360deg)}}
   @keyframes arrive{from{opacity:0;transform:translateY(.5rem)}}
@@ -66,7 +65,7 @@
     .brand strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
     main{padding-bottom:8.5rem}.connection{padding-inline:.55rem;font-size:.66rem;letter-spacing:.03em}#log{padding-block:1.25rem}
     .controls{display:grid;grid-template-columns:1fr auto;gap:.7rem .8rem}
-    #b{grid-column:1/-1;width:100%}.help span{font-size:.7rem}.headphones{align-self:start}}
+    #b{grid-column:1/-1;width:100%}.headphones{align-self:start}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -83,7 +82,7 @@
 </ol></main>
 <footer><div class="shell controls">
   <button id="b" type="button" data-mode="idle" aria-pressed="false"><span class="play-icon" aria-hidden="true"></span><span id="buttonText">Listen live · 收听直播</span></button>
-  <div class="help"><strong id="playHint">Audio is off · 音频尚未开启</strong><span>Subtitles arrive first; audio follows a little later.<br>字幕先到，语音会稍后播放。</span></div>
+  <div class="help"><strong id="playHint">Audio is off · 音频尚未开启</strong></div>
   <span class="headphones">🎧 Headphones · 请戴耳机</span>
 </div></footer>
 <audio id="a" preload="none"></audio>
@@ -121,12 +120,12 @@
   const addLine = ({ kind, text, at }) => {
     log.querySelector(".empty")?.remove();
     const safeKind = kind === "src" ? "src" : "out";
-    log.querySelector(`[data-kind="${safeKind}"]`)?.remove();
     const item = document.createElement("li"), meta = document.createElement("div"), body = document.createElement("p");
     item.dataset.kind = safeKind;
     meta.className = "line-meta"; meta.textContent = `${at || "Live"} · ${safeKind === "src" ? "Heard / 原文" : "Translation / 翻译"}`;
     body.className = safeKind; body.textContent = text; item.append(meta, body); log.appendChild(item);
-    while (log.children.length > 2) log.firstChild.remove();
+    while (log.children.length > 40) log.firstChild.remove();
+    log.scrollTop = log.scrollHeight; // every new line returns listeners to the live edge
   };
   const es = new EventSource("/subs");
   es.onopen = () => connection("live", "Live · 已连接");

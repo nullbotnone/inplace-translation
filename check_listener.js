@@ -57,9 +57,11 @@ if (ids.log.children[0].children[1].textContent !== "<b>神爱世人</b>")
 
 for (let i = 0; i < 60; i++)
   eventSource.onmessage({ data: JSON.stringify({ kind: i % 2 ? "src" : "out", text: `line ${i}`, at: `10:32:${i}` }) });
-if (ids.log.children.length !== 2) throw new Error(`expected only the latest heard/translation, got ${ids.log.children.length}`);
-if (ids.log.children.map((kid) => kid.dataset.kind).sort().join(",") !== "out,src")
-  throw new Error("the latest heard/translation pair was not retained");
+if (ids.log.children.length !== 40) throw new Error(`expected bounded transcript history, got ${ids.log.children.length}`);
+if (ids.log.children.at(-1).children[1].textContent !== "line 59")
+  throw new Error("the latest transcript line was not retained");
+if (ids.log.scrollTop !== ids.log.scrollHeight)
+  throw new Error("the transcript did not return to the live edge");
 
 ids.b.onclick();
 if (ids.b.dataset.mode !== "loading") throw new Error("play button did not show its loading state");
@@ -70,4 +72,4 @@ if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could
 
 eventSource.onerror();
 if (ids.connection.dataset.state !== "offline") throw new Error("disconnect was not surfaced");
-console.log("ok: listener UI connects, keeps the latest heard/translation, escapes text, and toggles audio");
+console.log("ok: listener UI connects, preserves history at the live edge, escapes text, and toggles audio");
