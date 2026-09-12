@@ -10,25 +10,32 @@
     color-scheme:dark;
     --bg:#071013;--surface:#0b181b;--surface-2:#112121;--ink:#f1eadb;--dim:#a9a899;
     --line:#dccca429;--line-strong:#d2bb8454;--accent:#8fa7c2;--on-accent:#08151c;
-    --ok:#91a89f;--warn:#e2c57b;--bad:#c98f7b;
+    --accent-soft:#8fa7c21c;--ok:#91a89f;--warn:#e2c57b;--bad:#c98f7b;
+    --glow:#8fa7c210;--shadow:#00000030;
     --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   :root[data-theme="light"]{
     color-scheme:light;
     --bg:#f1eadb;--surface:#faf5e9;--surface-2:#e8dfcc;--ink:#102022;--dim:#5f6964;
     --line:#8b754936;--line-strong:#9b7d3f80;--accent:#3f5d7d;--on-accent:#f6f1e6;
-    --ok:#4a6b5d;--warn:#8a6a1f;--bad:#a05a42;
+    --accent-soft:#3f5d7d12;--ok:#4a6b5d;--warn:#8a6a1f;--bad:#a05a42;
+    --glow:#3f5d7d12;--shadow:#4b391510;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
+  body{margin:0;min-height:100vh;background:
+       radial-gradient(circle at 50% -10rem,var(--glow),transparent 34rem),var(--bg);color:var(--ink);
        font:15px/1.6 system-ui,"PingFang SC","Noto Sans SC",sans-serif}
-  .wrap{max-width:60rem;margin:0 auto;padding:1.5rem}
-  h1{margin:0;font-size:1.1rem;font-weight:650;letter-spacing:-.01em}
+  .wrap{max-width:74rem;margin:0 auto;padding:clamp(1rem,3vw,2rem)}
+  h1{margin:0;font-size:clamp(1.15rem,2vw,1.35rem);font-weight:720;letter-spacing:-.025em}
   h2{margin:0 0 1rem;font:750 .72rem/1.4 var(--mono);letter-spacing:.12em;
      text-transform:uppercase;color:var(--dim)}
-  header{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;
-         padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
-  .actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding-top:1.1rem}
+  header{display:flex;align-items:center;gap:.85rem;flex-wrap:wrap;padding:.2rem 0 1.15rem}
+  .brand{display:flex;flex-direction:column;line-height:1.25}
+  .brand p{margin:.15rem 0 0;color:var(--dim);font-size:.78rem}
+  .actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .commandbar{position:sticky;top:0;z-index:10;margin-inline:clamp(-2rem,-3vw,-1rem);
+              padding:.75rem clamp(1rem,3vw,2rem);border-block:1px solid var(--line);
+              background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px)}
   .actions-inline{margin-top:.7rem;gap:.5rem}
   .grow{flex:1}
   .mark{width:1.9rem;height:1.9rem;flex:0 0 auto;border-radius:.45rem;display:block}
@@ -45,11 +52,16 @@
   @keyframes pulse{50%{opacity:.3}}
 
   button{font:inherit;font-size:.88rem;font-weight:650;padding:.55rem 1.1rem;border-radius:8px;
-         border:1px solid var(--line-strong);background:transparent;color:var(--ink);cursor:pointer}
+         border:1px solid var(--line-strong);background:transparent;color:var(--ink);cursor:pointer;
+         transition:border-color .16s,color .16s,background .16s,transform .16s,filter .16s}
   button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:active:not(:disabled){transform:translateY(1px)}
   button:disabled{opacity:.35;cursor:not-allowed}
   button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   button.primary:hover:not(:disabled){filter:brightness(1.1);color:var(--on-accent)}
+  button.attention{border-color:var(--warn);color:var(--warn);box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 12%,transparent)}
+  button.compact{padding:.35rem .65rem;font-size:.76rem}
+  button[aria-busy="true"]{cursor:progress}
 
   /* Language and theme controls, same shape as the rest of slashai.app. */
   .seg{display:inline-flex;padding:.2rem;border:1px solid var(--line);border-radius:999px;
@@ -69,18 +81,24 @@
                                        box-shadow:inset -.32rem -.2rem 0 currentColor}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 
-  /* Two deliberate columns rather than auto-fit: the cards are paired by height, so the
-     two short ones share a row and the two tall ones share the next. */
-  .cards{display:grid;gap:1rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:1.5rem}
-  @media (max-width:46rem){.cards{grid-template-columns:1fr}}
+  .cards{display:grid;gap:1rem;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:1.25rem}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
-        padding:1.2rem;display:flex;flex-direction:column}
+        padding:1.25rem;display:flex;flex-direction:column;grid-column:span 6;
+        box-shadow:0 12px 35px var(--shadow)}
+  .card.quality{grid-column:span 8}
+  .card.listeners-card{grid-column:span 4}
+  .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+  .card-head h2{margin-bottom:1rem}
+  @media (max-width:62rem){.card,.card.quality,.card.listeners-card{grid-column:1/-1}}
   label{display:block;margin-bottom:1rem}
   .card > label:last-of-type{margin-bottom:.6rem}
   .card .hint:last-child{margin-top:auto;padding-top:.6rem}
   label span{display:block;margin-bottom:.3rem;font-size:.82rem;color:var(--dim)}
   select,input[type=number],textarea{width:100%;font:inherit;font-size:.88rem;color:var(--ink);
-    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem}
+    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.58rem .7rem;
+    outline:0;transition:border-color .16s,box-shadow .16s}
+  select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible,.url:focus-visible{
+    border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);outline:0}
   textarea{min-height:9rem;flex:1;font:.82rem/1.7 var(--mono);resize:vertical}
   .row{display:flex;gap:.8rem;align-items:flex-end}
   .row label{flex:1}
@@ -98,8 +116,11 @@
 
   #qr{display:grid;place-items:center;padding:.8rem;background:#fff;border-radius:10px}
   #qr svg{display:block;width:100%;height:auto;max-width:11rem}
-  .url{margin:.7rem 0 0;text-align:center;font:.85rem/1.5 var(--mono);word-break:break-all;
-       color:var(--accent)}
+  .url{display:block;margin:.7rem 0 0;text-align:center;font:.82rem/1.5 var(--mono);
+       overflow-wrap:anywhere;color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
+  .share-actions{justify-content:center;margin-top:.7rem}
+  .count{font:650 .72rem/1.4 var(--mono);color:var(--dim);white-space:nowrap}
+  .count.warn{color:var(--warn)}
 
   /* max-height is what makes it scroll: flex:1 with no upper bound just grows to fit
      the content, so overflow-y never engages and the card gets taller all service. */
@@ -112,10 +133,16 @@
   #log .out{font-size:1rem}
   .empty{color:var(--dim);font-size:.85rem}
 
-  .toast{position:fixed;left:50%;bottom:1.5rem;transform:translate(-50%,2rem);opacity:0;
+  .toast{position:fixed;z-index:20;left:50%;bottom:1.5rem;transform:translate(-50%,2rem);opacity:0;
          background:var(--surface-2);border:1px solid var(--line-strong);border-radius:999px;
-         padding:.6rem 1.1rem;font-size:.82rem;font-weight:650;transition:.2s;pointer-events:none}
+         max-width:calc(100vw - 2rem);padding:.6rem 1.1rem;font-size:.82rem;font-weight:650;
+         text-align:center;box-shadow:0 12px 35px var(--shadow);transition:.2s;pointer-events:none}
   .toast.show{opacity:1;transform:translate(-50%,0)}
+  @media (max-width:40rem){
+    .wrap{padding:1rem}.commandbar{margin-inline:-1rem;padding-inline:1rem}
+    .commandbar .grow{display:none}.commandbar #detail{flex-basis:100%;margin:0}
+    .row{display:grid;grid-template-columns:1fr}.brand p{display:none}
+  }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -124,8 +151,14 @@
 
 <header>
   <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#071013"/><path d="M6 10a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v7a4 4 0 0 1-4 4h-8l-5 5v-5h-1a2 2 0 0 1-2-2z" fill="#f1eadb"/><rect x="10" y="10" width="12" height="2.6" rx="1.3" fill="#071013"/><rect x="10" y="14.8" width="7.5" height="2.6" rx="1.3" fill="#8fa7c2"/></svg>
-  <h1 data-zh="讲道翻译控制台" data-tw="講道翻譯控制台" data-en="Sermon Translation"></h1>
-  <span class="state" id="state" data-s="stopped"><i></i><span id="statetext"></span></span>
+  <div class="brand">
+    <h1 data-zh="讲道翻译控制台" data-tw="講道翻譯控制台" data-en="Sermon Translation"></h1>
+    <p data-zh="现场翻译运行与监听" data-tw="現場翻譯執行與監聽"
+       data-en="Live translation control and monitoring"></p>
+  </div>
+  <span class="state" id="state" data-s="stopped" role="status" aria-live="polite">
+    <i aria-hidden="true"></i><span id="statetext"></span>
+  </span>
   <span class="grow"></span>
   <!-- No data-* translation on this element: labels() writes textContent, which would
        replace these buttons with the label text. The sermon's languages are named in
@@ -141,7 +174,7 @@
   </button>
 </header>
 
-<div class="actions">
+<div class="actions commandbar">
   <button class="primary" id="startbtn" data-zh="启动" data-tw="啟動" data-en="Start"></button>
   <button id="stopbtn" data-zh="停止" data-tw="停止" data-en="Stop"></button>
   <button id="restartbtn" data-zh="重启" data-tw="重啟" data-en="Restart"></button>
@@ -151,7 +184,7 @@
 
 <div class="cards">
 
-  <div class="card">
+  <section class="card">
     <h2 data-zh="讲道语言" data-tw="講道語言" data-en="Sermon languages"></h2>
     <label>
       <span data-zh="讲员说的语言" data-tw="講員說的語言" data-en="The preacher speaks"></span>
@@ -171,9 +204,9 @@
       </select>
     </label>
     <p class="hint" id="langhint"></p>
-  </div>
+  </section>
 
-  <div class="card">
+  <section class="card">
     <h2 data-zh="麦克风" data-tw="麥克風" data-en="Microphone"></h2>
     <label>
       <span data-zh="输入设备" data-tw="輸入裝置" data-en="Input device"></span>
@@ -189,9 +222,9 @@
        data-en="Click this if you paired a headset after opening this page — the list is only read when the page loads."></p>
     <div class="meter"><i id="level"></i></div>
     <p class="hint" id="levelhint"></p>
-  </div>
+  </section>
 
-  <div class="card">
+  <section class="card quality">
     <h2 data-zh="翻译质量" data-tw="翻譯品質" data-en="Translation quality"></h2>
     <label>
       <span data-zh="语言模型" data-tw="語言模型" data-en="Language model"></span>
@@ -239,20 +272,27 @@
        data-tw="語音斷斷續續就把緩衝調大，嫌慢就調小。立刻生效，不用重啟。"
        data-en="Raise the voice buffer if the audio chops, lower it if the voice lags behind. Applies at once — no restart."></p>
     <p class="hint" id="restarthint"></p>
-  </div>
+  </section>
 
-  <div class="card">
+  <section class="card listeners-card">
     <h2 data-zh="听众" data-tw="聽眾" data-en="Listeners"></h2>
-    <div id="qr"></div>
-    <p class="url" id="url"></p>
+    <div id="qr" role="img" aria-label="Listener QR code"></div>
+    <a class="url" id="url" target="_blank" rel="noopener"></a>
+    <div class="actions share-actions">
+      <button class="compact" id="copyurl" type="button" data-zh="复制听众链接"
+              data-tw="複製聽眾連結" data-en="Copy listener link"></button>
+    </div>
     <div class="stat">
       <b data-zh="当前连接" data-tw="目前連線" data-en="Connected now"></b>
       <span id="listeners">0</span>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2 data-zh="词表" data-tw="詞表" data-en="Glossary"></h2>
+  <section class="card">
+    <div class="card-head">
+      <h2 data-zh="词表" data-tw="詞表" data-en="Glossary"></h2>
+      <span class="count" id="glossarycount"></span>
+    </div>
     <p class="hint"
        data-zh="告诉翻译该怎么处理你们的专有名词。每句话都会带上这份词表，所以越短越好。以 # 开头的行是给你自己看的注释，不会进模型。保存后下一句就生效，不用重启。"
        data-tw="告訴翻譯該怎麼處理你們的專有名詞。每句話都會帶上這份詞表，所以越短越好。以 # 開頭的行是給你自己看的註解，不會進模型。儲存後下一句就生效，不用重啟。"
@@ -263,17 +303,21 @@
       <button id="loadexample" data-zh="插入示例" data-tw="插入範例"
               data-en="Insert an example"></button>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2 data-zh="实时字幕" data-tw="即時字幕" data-en="Live transcript"></h2>
+  <section class="card">
+    <div class="card-head">
+      <h2 data-zh="实时字幕" data-tw="即時字幕" data-en="Live transcript"></h2>
+      <button class="compact" id="clearlog" type="button" data-zh="清空" data-tw="清空"
+              data-en="Clear"></button>
+    </div>
     <ul id="log"><li class="empty" data-zh="还没有内容。" data-tw="還沒有內容。"
                      data-en="Nothing yet."></li></ul>
-  </div>
+  </section>
 
 </div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -286,26 +330,35 @@ const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 const STR = {
   zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台断开",
         sysdefault:"系统默认", rescanned:"设备已重新扫描", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
+        copied:"听众链接已复制", copyfailed:"无法复制 — 请手动选择链接", cleared:"字幕已清空",
+        requestfailed:"操作失败 — 请检查控制台连接", glossarycount:"{n} 个字符",
         restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
         micprompt:"对着麦克风说话，这条会动。", micgood:"声音正常。",
         micsilent:"没有声音进来 — 检查线和上面选的设备。", micclip:"爆音了 — 把音控台的输出调小。",
         direction:"{a} 讲道 → 听众听到 {b}。", samelang:"讲员说的和听众听到的是同一种语言，不会有翻译。",
+        autolang:"讲员语言设为「自动」：凡是用{b}讲的都不会翻译，听众那边是静音。讲道用哪种语言就选哪种。",
         heard:"听到", translated:"翻译" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
         sysdefault:"系統預設", rescanned:"裝置已重新掃描", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
+        copied:"聽眾連結已複製", copyfailed:"無法複製 — 請手動選取連結", cleared:"字幕已清空",
+        requestfailed:"操作失敗 — 請檢查控制台連線", glossarycount:"{n} 個字元",
         restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
         micprompt:"對著麥克風說話，這條會動。", micgood:"聲音正常。",
         micsilent:"沒有聲音進來 — 檢查線和上面選的裝置。", micclip:"爆音了 — 把音控台的輸出調小。",
         direction:"{a} 講道 → 聽眾聽到 {b}。", samelang:"講員說的和聽眾聽到的是同一種語言，不會有翻譯。",
+        autolang:"講員語言設為「自動」：凡是用{b}講的都不會翻譯，聽眾那邊是靜音。講道用哪種語言就選哪種。",
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
         nolink:"no console link", sysdefault:"System default", rescanned:"Device list refreshed", saved:"Saved",
         glossarysaved:"Glossary saved", exampleadded:"Example added — edit it for your church, then save", restarting:"Restarting — models take a minute",
+        copied:"Listener link copied", copyfailed:"Could not copy — select the link manually", cleared:"Transcript cleared",
+        requestfailed:"Action failed — check the console connection", glossarycount:"{n} characters",
         restartneeded:"Restart to apply — the new model has to load.",
         micprompt:"Speak into the mic — the bar should move.", micgood:"Audio looks good.",
         micsilent:"No audio reaching the Mac — check the cable and the device above.",
         micclip:"Clipping — turn the send down at the desk.",
         direction:"Preached in {a}, heard as {b}.", samelang:"Source and target are the same language — nothing will be translated.",
+        autolang:"Source is Auto, so anything preached in {b} is passed over and the listeners hear silence. Pick the language the sermon is in.",
         heard:"HEARD", translated:"TRANSLATED" },
 };
 
@@ -332,6 +385,7 @@ let current = null;          // last status from the server
 let deviceList = null;       // filled once by /api/devices
 let restartPending = false;
 let linkLost = false;
+let busyAction = null;
 let qrUrl = null;            // the URL the QR on screen actually encodes
 const t = (key) => STR[lang][key];
 
@@ -370,6 +424,7 @@ function labels() {
     el.textContent = el.dataset[lang] || el.dataset.en;
   });
   $("glossary").placeholder = PLACEHOLDER[lang];
+  updateGlossaryCount();
   document.querySelectorAll("#langseg button").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
   });
@@ -386,6 +441,7 @@ function labels() {
 function paint() {
   $("restarthint").textContent = restartPending ? t("restartneeded") : "";
   $("restarthint").className = "hint" + (restartPending ? " warn" : "");
+  $("restartbtn").className = restartPending ? "attention" : "";
 
   const s = current;
   if (linkLost) { $("state").dataset.s = "error"; $("statetext").textContent = t("nolink"); }
@@ -394,13 +450,18 @@ function paint() {
 
   const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
   const same = s.config.source === s.config.target;
+  // "auto" is not equal to the target but can turn out to be it, and the translator is told
+  // to stay silent on anything already in the target language. That reads as a dead system.
+  const maybeSame = !same && s.config.source === "auto";
   $("langhint").textContent = same ? t("samelang")
+    : maybeSame ? t("autolang").replace("{b}", into)
     : t("direction").replace("{a}", from).replace("{b}", into);
-  $("langhint").className = "hint" + (same ? " warn" : "");
+  $("langhint").className = "hint" + (same || maybeSame ? " warn" : "");
 
   $("detail").textContent = s.detail || "";
   $("listeners").textContent = s.listeners;
   $("url").textContent = s.url;
+  $("url").href = s.url || "";
   if (s.url && s.url !== qrUrl) {
     qrUrl = s.url;
     fetch("/qr.svg").then((r) => (r.ok ? r.text() : "")).then((svg) => {
@@ -414,8 +475,11 @@ function paint() {
   $("levelhint").textContent = s.state !== "running" ? t("micprompt")
     : s.level < .02 ? t("micsilent") : s.level > .92 ? t("micclip") : t("micgood");
 
-  $("startbtn").disabled = s.state === "running" || s.state === "starting";
-  $("stopbtn").disabled = s.state === "stopped";
+  $("startbtn").disabled = linkLost || busyAction !== null || s.state === "running" || s.state === "starting";
+  $("stopbtn").disabled = linkLost || busyAction !== null || s.state === "stopped";
+  $("restartbtn").disabled = linkLost || busyAction !== null || s.state === "starting";
+  ["startbtn", "stopbtn", "restartbtn"].forEach((id) =>
+    $(id).setAttribute("aria-busy", String(busyAction === id)));
 
   // Don't fight the operator's cursor: only fill fields they aren't editing.
   CFG.forEach((key) => {
@@ -434,11 +498,35 @@ const toast = (key) => {
 };
 
 const post = (path, body) =>
-  fetch(path, { method: "POST", body: JSON.stringify(body || {}) }).then((r) => r.json());
+  fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}) }).then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    });
 
-$("startbtn").onclick = () => post("/api/start");
-$("stopbtn").onclick = () => post("/api/stop");
-$("restartbtn").onclick = () => { post("/api/restart"); restartPending = false; paint(); toast("restarting"); };
+const act = async (id, path, done) => {
+  busyAction = id;
+  paint();
+  try {
+    const result = await post(path);
+    if (done) done(result);
+    return result;
+  } catch (error) {
+    console.error(error);
+    toast("requestfailed");
+    return null;
+  } finally {
+    busyAction = null;
+    paint();
+  }
+};
+
+$("startbtn").onclick = () => act("startbtn", "/api/start");
+$("stopbtn").onclick = () => act("stopbtn", "/api/stop");
+$("restartbtn").onclick = () => act("restartbtn", "/api/restart", () => {
+  restartPending = false;
+  toast("restarting");
+});
 $("loadexample").onclick = () => fetch("/api/glossary/example")
   .then((r) => (r.ok ? r.text() : "")).then((text) => {
     if (!text) return;
@@ -449,8 +537,33 @@ $("loadexample").onclick = () => fetch("/api/glossary/example")
     toast("exampleadded");
   });
 
-$("savegloss").onclick = () =>
-  post("/api/glossary", { text: $("glossary").value }).then(() => toast("glossarysaved"));
+function updateGlossaryCount() {
+  const n = $("glossary").value.length;
+  $("glossarycount").textContent = t("glossarycount").replace("{n}", n.toLocaleString());
+  $("glossarycount").className = "count" + (n > 1200 ? " warn" : "");
+}
+
+$("glossary").addEventListener("input", updateGlossaryCount);
+$("savegloss").onclick = async () => {
+  try {
+    await post("/api/glossary", { text: $("glossary").value });
+    toast("glossarysaved");
+  } catch (error) {
+    console.error(error);
+    toast("requestfailed");
+  }
+};
+
+$("copyurl").onclick = async () => {
+  if (!current?.url) return;
+  try {
+    await navigator.clipboard.writeText(current.url);
+    toast("copied");
+  } catch (_) {
+    toast("copyfailed");
+    $("url").focus();
+  }
+};
 
 $("langseg").onclick = (e) => {
   const b = e.target.closest("button");
@@ -470,13 +583,21 @@ CFG.forEach((key) => $(key).addEventListener("change", () => {
   let value = el.type === "number" ? Number(el.value) : el.value;
   if (key === "device") value = el.value === "" ? null : el.value;
   post("/api/config", { [key]: value }).then((r) => {
-    restartPending = r.restart_required;
+    // A live setting can save after a model setting. Never let its `false` response erase
+    // the restart the earlier change still needs.
+    restartPending = restartPending || r.restart_required;
     paint();
     toast("saved");
+  }).catch((error) => {
+    console.error(error);
+    toast("requestfailed");
   });
 }));
 
-fetch("/api/glossary").then((r) => r.json()).then(({ text }) => { $("glossary").value = text; });
+fetch("/api/glossary").then((r) => r.json()).then(({ text }) => {
+  $("glossary").value = text;
+  updateGlossaryCount();
+}).catch((error) => console.error(error));
 
 const loadDevices = () =>
   fetch("/api/devices").then((r) => r.json()).then(({ devices, error }) => {
@@ -492,6 +613,25 @@ loadDevices();
 // back up, which is what /api/devices does. Nothing else on this page may trigger that: it
 // closes and reopens the mic, so it stays on a button the operator presses.
 $("rescan").addEventListener("click", () => loadDevices().then(() => toast("rescanned")));
+
+$("clearlog").onclick = () => {
+  const empty = document.createElement("li");
+  empty.className = "empty";
+  empty.dataset.zh = "还没有内容。";
+  empty.dataset.tw = "還沒有內容。";
+  empty.dataset.en = "Nothing yet.";
+  empty.textContent = empty.dataset[lang];
+  $("log").replaceChildren(empty);
+  toast("cleared");
+};
+
+document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s" &&
+      document.activeElement === $("glossary")) {
+    event.preventDefault();
+    $("savegloss").click();
+  }
+});
 
 function addLine(line) {
   const log = $("log");
