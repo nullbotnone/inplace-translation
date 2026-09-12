@@ -37,6 +37,9 @@
               padding:.75rem clamp(1rem,3vw,2rem);border-block:1px solid var(--line);
               background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px)}
   .actions-inline{margin-top:.7rem;gap:.5rem}
+  /* A notice, not a continuation of the hint above it: two paragraphs of hint text running
+     together read as one contradictory sentence. */
+  #restarthint:not(:empty){margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
   /* A setting the running engine ignores. Dimmed rather than hidden, so switching back does
      not make controls appear out of nowhere. */
   [data-cascade-only].inert{opacity:.4}
@@ -241,6 +244,7 @@
                 data-en="Qwen3-Omni 30B — direct audio translation, no recogniser (experimental; requires 64 GB)"></option>
       </select>
     </label>
+    <p class="hint" id="enginehint"></p>
     <label data-cascade-only>
       <span data-zh="语言模型" data-tw="語言模型" data-en="Language model"></span>
       <select id="model">
@@ -256,7 +260,6 @@
                 data-en="Qwen3.6 35B — most accurate Bible references; requires 64 GB"></option>
       </select>
     </label>
-    <p class="hint" id="enginehint"></p>
     <label>
       <span data-zh="语音" data-tw="語音" data-en="Voice"></span>
       <select id="tts">
@@ -284,9 +287,9 @@
       </label>
     </div>
     <p class="hint"
-       data-zh="语音断续时调大，语音落后讲员时调小。立即生效，无需重启。"
-       data-tw="語音斷續時調大，語音落後講員時調小。立即生效，無需重啟。"
-       data-en="Increase if the audio breaks up; decrease if the voice falls behind the preacher. Applies immediately; no restart required."></p>
+       data-zh="语音缓冲：语音断续时调大，语音落后讲员时调小。立即生效。"
+       data-tw="語音緩衝：語音斷續時調大，語音落後講員時調小。立即生效。"
+       data-en="Voice buffer: increase if the audio breaks up, decrease if the voice falls behind the preacher. Takes effect immediately."></p>
     <p class="hint" id="restarthint"></p>
   </section>
 
@@ -348,7 +351,7 @@ const STR = {
         sysdefault:"系统默认", rescanned:"设备已重新扫描", omniignores:"Qwen3-Omni 直接处理语音，讲员语言、语言模型与上下文设定均不适用。", omnilang:"听众听到{b}。讲道语言由模型自动侦测。", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入。请依贵会需要修改后保存。",
         copied:"听众链接已复制", copyfailed:"复制失败，请手动选取链接。", cleared:"字幕已清空",
         requestfailed:"操作失败，请检查控制台连接。", glossarycount:"{n} 个字符",
-        restarting:"正在重启。模型加载约需一分钟。", restartneeded:"需要重启方可生效，新模型须重新加载。",
+        restarting:"正在重启。模型加载约需一分钟。", restartneeded:"需要重启：刚才更改的设定要重启后才会生效。",
         micprompt:"请对麦克风讲话，音量条应有反应。", micgood:"输入音量正常。",
         micsilent:"未侦测到音频输入，请检查线路与所选设备。", micclip:"输入音量过载，请调低音控台的输出电平。",
         direction:"讲道语言为{a}，听众听到{b}。", samelang:"讲道语言与听众语言相同，不会进行翻译。",
@@ -358,7 +361,7 @@ const STR = {
         sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"Qwen3-Omni 直接處理語音，講員語言、語言模型與上下文設定均不適用。", omnilang:"聽眾聽到{b}。講道語言由模型自動偵測。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入。請依貴會需要修改後儲存。",
         copied:"聽眾連結已複製", copyfailed:"複製失敗，請手動選取連結。", cleared:"字幕已清空",
         requestfailed:"操作失敗，請檢查控制台連線。", glossarycount:"{n} 個字元",
-        restarting:"正在重啟。模型載入約需一分鐘。", restartneeded:"需要重啟方可生效，新模型須重新載入。",
+        restarting:"正在重啟。模型載入約需一分鐘。", restartneeded:"需要重啟：剛才更改的設定要重啟後才會生效。",
         micprompt:"請對麥克風講話，音量條應有反應。", micgood:"輸入音量正常。",
         micsilent:"未偵測到音訊輸入，請檢查線路與所選裝置。", micclip:"輸入音量過載，請調低音控台的輸出電平。",
         direction:"講道語言為{a}，聽眾聽到{b}。", samelang:"講道語言與聽眾語言相同，不會進行翻譯。",
@@ -369,7 +372,7 @@ const STR = {
         glossarysaved:"Glossary saved", exampleadded:"Example inserted. Edit it for your congregation, then save.", restarting:"Restarting. Loading the models takes a minute.",
         copied:"Listener link copied", copyfailed:"Copy failed. Select the link manually.", cleared:"Transcript cleared",
         requestfailed:"Request failed. Check the console connection.", glossarycount:"{n} characters",
-        restartneeded:"Restart required. The new model must load first.",
+        restartneeded:"Restart required — the setting you just changed takes effect after restarting.",
         micprompt:"Speak into the microphone. The level meter should respond.", micgood:"Input level is normal.",
         micsilent:"No audio input detected. Check the cable and the selected device.",
         micclip:"Input is clipping. Reduce the send level at the mixing desk.",
