@@ -315,9 +315,9 @@ const t = (key) => STR[lang][key];
 
 /* Spoken/heard language names, per console language. */
 const PLACEHOLDER = {
-  zh: "# 注释写在 # 后面，不会进模型\n\n翻译以下词汇时请统一用法：\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\n引用圣经请用和合本的用词。",
-  tw: "# 註解寫在 # 後面，不會進模型\n\n翻譯以下詞彙時請統一用法：\n  fellowship -> 團契\n  Pastor John Smith -> 史約翰牧師\n\n引用聖經請用和合本的用詞。",
-  en: "# notes after a # are never sent to the model\n\nRender these terms consistently:\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\nQuote scripture in 和合本 wording.",
+  zh: "# 注释写在 # 后面，不会进模型\n\n翻译以下词汇时请统一用法：\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\n# 圣经书卷名已内置（和合本），无需在此重复。",
+  tw: "# 註解寫在 # 後面，不會進模型\n\n翻譯以下詞彙時請統一用法：\n  fellowship -> 團契\n  Pastor John Smith -> 史約翰牧師\n\n# 聖經書卷名已內建（和合本），無須在此重複。",
+  en: "# notes after a # are never sent to the model\n\nRender these terms consistently:\n  fellowship -> 团契\n  Pastor John Smith -> 史约翰牧师\n\n# the 66 Chinese book names are built in; no need to repeat them here",
 };
 
 const LANGNAME = {

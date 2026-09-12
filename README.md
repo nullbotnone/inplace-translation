@@ -177,8 +177,9 @@ Four things to get right on a Mac that nobody logs into on Sunday morning:
 
 All of this lives in the console; the notes below are why each one is there.
 
-- **`glossary.txt`** — your ministry names, your elders' names, and the Bible translation you
-  quote (和合本 vs 新译本 wording). The single biggest quality win available to you.
+- **`glossary.txt`** — your ministry names and your elders' names. The single biggest quality
+  win available to you. The 66 Chinese book names (和合本) are already built into the prompt,
+  so only name a translation here if your church quotes a different one.
   `cp glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
   since it ends up full of real people's names. Keep it short — it is re-read on every
   utterance, so a long one costs latency on every sentence of the sermon.

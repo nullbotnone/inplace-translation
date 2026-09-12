@@ -14,8 +14,10 @@ House style for this congregation:
 # reads Traditional characters — it makes no difference to the spoken translation.
 # Write all Chinese in Traditional characters (繁體), not Simplified.
 
-Quote scripture in 和合本 wording, and use its Chinese book names. Keep chapter and verse
-in digits: "John 3:16" -> "约翰福音 3:16".
+# The 66 Chinese book names (和合本) are built in, and chapter and verse already come across
+# in digits, so there is nothing to add here unless your church uses a different translation:
+# name it on the next line and delete this note.
+# Use 新译本 book names rather than 和合本.
 
 # Terms a small model reliably gets wrong. Yours will differ by denomination —
 # 洗礼 vs 浸礼 is the usual one to check.

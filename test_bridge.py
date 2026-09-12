@@ -96,6 +96,26 @@ assert "talking in English" in bridge.instructions(en2zh)
 assert "into Chinese" in bridge.instructions(en2zh)
 assert "talking in Chinese" in bridge.instructions(zh2en)
 assert "into English" in bridge.instructions(zh2en)
+# the worked example is the text the model borrows from, so it must not carry a scripture
+# reference: an example naming "John 3" is what turned a bare 约翰福音 into "John 3"
+for cfg in (en2zh, zh2en):
+    heard, said = bridge.EXAMPLE[cfg["target"]]
+    assert not any(c.isdigit() for c in heard + said), f"a number in the example: {heard!r}"
+    assert not any(b.split(" = ")[0] in heard + said or b.split(" = ")[1] in heard + said
+                   for line in bridge.BIBLE_BOOKS.splitlines() for b in line.split(" | ")), \
+        "the example names a book of the Bible"
+
+# every book name is pinned, both directions, so none of them is left to a 4B model's memory
+books = [b for line in bridge.BIBLE_BOOKS.splitlines() for b in line.split(" | ")]
+assert len(books) == 66, f"{len(books)} books, expected 66"
+assert all(len(b.split(" = ")) == 2 for b in books), "a book line is not 'English = 中文'"
+assert len({b.split(" = ")[0] for b in books}) == 66, "a duplicate English book name"
+assert len({b.split(" = ")[1] for b in books}) == 66, "a duplicate Chinese book name"
+for cfg in (en2zh, zh2en):
+    prompt = bridge.instructions(cfg)
+    assert "John = 约翰福音" in prompt and "Habakkuk = 哈巴谷书" in prompt, "book list missing"
+    assert "guess a chapter or verse" in prompt, "nothing forbids inventing a verse number"
+
 # 简体/繁體 is a written distinction listeners cannot hear, so it is not a target;
 # a church that reads Traditional asks for it in the glossary, which still reaches the prompt
 bridge.GLOSSARY_PATH.write_text("Write all Chinese in Traditional characters (繁體).")

@@ -61,13 +61,34 @@ def valid(key, value):
     return isinstance(value, str) and value.strip() != ""
 
 # One worked pair per direction. A small model that is *told* not to answer still answers;
-# shown one utterance it would rather reply to, it stops.
+# shown one utterance it would rather reply to, it stops. The example is also the one piece
+# of text it will happily borrow from, so it carries no names, no numbers and no scripture
+# reference: an example holding "John 3" is how a bare 约翰福音 came back out as "John 3".
 EXAMPLE = {
-    "zh": ("Do you know what that means? Turn with me to John 3.",
-           "你知道那是什么意思吗？请和我一起翻到约翰福音 3 章。"),
-    "en": ("你知道那是什么意思吗？请和我一起翻到约翰福音 3 章。",
-           "Do you know what that means? Turn with me to John 3."),
+    "zh": ("Do you know what that means?", "你知道那是什么意思吗？"),
+    "en": ("你知道那是什么意思吗？", "Do you know what that means?"),
 }
+
+# The 66 book names, English = 和合本. A 4B model guesses at the rarer ones and invents
+# chapter numbers to go with them; sermons are mostly book names, so pin them here rather
+# than leaving each church to type them into the glossary.
+BIBLE_BOOKS = """Genesis = 创世记 | Exodus = 出埃及记 | Leviticus = 利未记 | Numbers = 民数记
+Deuteronomy = 申命记 | Joshua = 约书亚记 | Judges = 士师记 | Ruth = 路得记
+1 Samuel = 撒母耳记上 | 2 Samuel = 撒母耳记下 | 1 Kings = 列王纪上 | 2 Kings = 列王纪下
+1 Chronicles = 历代志上 | 2 Chronicles = 历代志下 | Ezra = 以斯拉记 | Nehemiah = 尼希米记
+Esther = 以斯帖记 | Job = 约伯记 | Psalms = 诗篇 | Proverbs = 箴言 | Ecclesiastes = 传道书
+Song of Songs = 雅歌 | Isaiah = 以赛亚书 | Jeremiah = 耶利米书 | Lamentations = 耶利米哀歌
+Ezekiel = 以西结书 | Daniel = 但以理书 | Hosea = 何西阿书 | Joel = 约珥书 | Amos = 阿摩司书
+Obadiah = 俄巴底亚书 | Jonah = 约拿书 | Micah = 弥迦书 | Nahum = 那鸿书 | Habakkuk = 哈巴谷书
+Zephaniah = 西番雅书 | Haggai = 哈该书 | Zechariah = 撒迦利亚书 | Malachi = 玛拉基书
+Matthew = 马太福音 | Mark = 马可福音 | Luke = 路加福音 | John = 约翰福音 | Acts = 使徒行传
+Romans = 罗马书 | 1 Corinthians = 哥林多前书 | 2 Corinthians = 哥林多后书
+Galatians = 加拉太书 | Ephesians = 以弗所书 | Philippians = 腓立比书 | Colossians = 歌罗西书
+1 Thessalonians = 帖撒罗尼迦前书 | 2 Thessalonians = 帖撒罗尼迦后书
+1 Timothy = 提摩太前书 | 2 Timothy = 提摩太后书 | Titus = 提多书 | Philemon = 腓利门书
+Hebrews = 希伯来书 | James = 雅各书 | 1 Peter = 彼得前书 | 2 Peter = 彼得后书
+1 John = 约翰一书 | 2 John = 约翰二书 | 3 John = 约翰三书 | Jude = 犹大书
+Revelation = 启示录"""
 
 
 def base_prompt(cfg):
@@ -82,14 +103,24 @@ The speaker is talking in {SPOKEN[cfg["source"]]}. Translate every utterance int
   answer nothing, agree with nothing, and preach nothing of your own.
 - Sentence for sentence. Do not summarise, shorten, expand, or add anything the speaker did
   not say. Preserve the speaker's first person voice and register.
-- Keep Bible book/chapter/verse references and proper names exact.
+- Keep proper names exact.
+- Scripture references: take the book name from the list at the end of these instructions,
+  and repeat the chapter and verse the speaker gave, in digits, exactly as spoken. Never add,
+  change, complete or guess a chapter or verse number. A book named on its own stays a book
+  named on its own.
+- Translate the words the speaker actually said, including when they are quoting the Bible.
+  Never substitute remembered scripture wording, and never supply verse text they did not say.
 - Earlier turns are context for names and terminology only. Never re-translate them and never
   continue your own previous answer.
 - If the utterance is a fragment, translate the fragment as it stands; do not finish the thought.
 - If an utterance is unintelligible, or is already in {target}, output nothing.
 
 Speaker: {heard}
-You: {said}"""
+You: {said}
+
+Bible book names. Any house style in these instructions -- Traditional characters,
+a different translation's wording -- still applies on top of this list:
+{BIBLE_BOOKS}"""
 
 
 def load_config():
