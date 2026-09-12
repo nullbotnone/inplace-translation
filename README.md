@@ -221,9 +221,16 @@ All of this lives in the console; the notes below are why each one is there.
 - **Subtitles arrive before the audio they narrate**, by a second or two — the text exists as
   soon as the LLM finishes, the voice has to be synthesised and buffered. Nothing lines them
   up; reading ahead of the voice is the intended behaviour, not a bug to fix.
-- **A preacher who never pauses will drift.** TTS output is roughly as long as the input, so
-  there's no slack to catch up. Past 20 s of backlog `bridge.py` drops audio and resyncs to
-  live — a listener hears a gap, not an ever-growing delay.
+- **A preacher who never pauses will drift.** Nothing is translated until a pause, so a run of
+  speech with no gaps in it is held whole: measured on 18 s of continuous speech, the first
+  translated word reached the listener at 20 s. Normal preaching pauses between sentences and
+  costs about a second; this is the tail, not the common case.
+
+  The pipeline's `--max_speech_ms` looks like the fix and is not. It does split a long run, but
+  each forced split supersedes the one before it, and the earlier fragments are dropped as
+  stale: on that same 18 s sample it produced 1.9 s of audio for 20 s of speech — one sentence
+  out of six. Leave it at its default. Past 20 s of backlog `bridge.py` drops audio and resyncs
+  to live, so a listener hears a gap rather than an ever-growing delay.
 - **It will mistranslate.** Local models get theology wrong in interesting ways, the small
   ones spectacularly so. The 35B is the most reliable of the three and is still a local model.
   Treat it as a hearing aid for visitors, not as the sermon of record.
