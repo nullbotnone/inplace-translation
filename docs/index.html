@@ -233,7 +233,7 @@ cd ~                              <span class="c"># not Documents/Desktop/Downlo
 git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
 python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install speech-to-speech segno</code></pre>
+pip install speech-to-speech 'misaki[zh]' segno</code></pre>
 
     <p class="warn-note"
        data-zh="请把项目放在「文稿」「桌面」「下载」之外的位置。macOS 对这三个文件夹另有保护，在其中首次运行会弹出授权提示，需要有人确认。放在个人文件夹的其他位置则完全不需要授权。"
@@ -319,7 +319,7 @@ pip install speech-to-speech segno</code></pre>
       <tr><td data-zh="语音识别" data-tw="語音辨識" data-en="Recognition"></td><td data-zh="Whisper · MLX，仅级联" data-tw="Whisper · MLX，僅級聯" data-en="Whisper · MLX, cascade only"></td></tr>
       <tr><td data-zh="翻译" data-tw="翻譯" data-en="Translation"></td><td data-zh="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地运行" data-tw="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地執行" data-en="Qwen3 4B, 8B or Qwen3.6 35B-A3B, quantised, running locally"></td></tr>
       <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，由一个模型同时听取与翻译；需要 64 GB，尚未在真实聚会中使用过" data-tw="Qwen3-Omni 30B-A3B，由一個模型同時聽取與翻譯；需要 64 GB，尚未在真實聚會中使用過" data-en="Qwen3-Omni 30B-A3B. One model both hears and translates. It needs 64 GB and has not yet run a live service"></td></tr>
-      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Kokoro；需要更佳音质时改用 Qwen3-TTS" data-tw="Kokoro；需要更佳音質時改用 Qwen3-TTS" data-en="Kokoro, or Qwen3-TTS when better quality is wanted"></td></tr>
+      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Kokoro，8 种普通话声音与 20 种美式英语声音；需要更佳音质时改用 Qwen3-TTS" data-tw="Kokoro，8 種普通話聲音與 20 種美式英語聲音；需要更佳音質時改用 Qwen3-TTS" data-en="Kokoro, with 8 Mandarin and 20 American English voices, or Qwen3-TTS when better quality is wanted"></td></tr>
       <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉成 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, distributed by Python's standard-library HTTP server"></td></tr>
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>

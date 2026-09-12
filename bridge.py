@@ -29,8 +29,27 @@ LOAD_TIMEOUT_S = 3600             # the port stays shut until the models are dow
                                   # the 35B option is a 35 GB first run. A pipeline that dies
                                   # is caught by poll(), so this only backstops a live hang.
 
+# run_pipeline.py is the `speech-to-speech serve` command with one patch applied; see there.
+LAUNCH = [sys.executable, str(HERE / "run_pipeline.py"), "serve"]
+
 CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
+
+# Kokoro's voices, by the language they speak. A voice is tied to its language: the first
+# letter of the name is the phonemiser that has to be loaded with it (z = Mandarin,
+# a = American English), and an American voice handed Chinese text says nothing usable. So
+# the target language decides which of these lists the console may offer. Second letter is
+# the gender. Qwen3-TTS has one voice of its own and ignores all of this.
+VOICES = {
+    "zh": ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
+           "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
+    "en": ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
+           "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+           "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
+           "am_onyx", "am_puck", "am_santa"],
+}
+DEFAULT_VOICE = {"zh": "zf_xiaoxiao", "en": "af_heart"}
+
 DEFAULTS = {
     "device": None,                                              # mic, by name; None = system default
     "source": "en",                                              # what the preacher speaks
@@ -38,14 +57,17 @@ DEFAULTS = {
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
     "stt": "mlx-audio-whisper",
     "tts": "kokoro",
+    "voice": DEFAULT_VOICE["zh"],                                # Kokoro only; must match "target"
     "chat_size": 2,
     "min_silence_ms": 64,
     "lead_ms": 1500,                                             # voice buffered before it plays
     "engine": "cascade",                                         # cascade | omni
 }
-NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source", "engine"}
+NEEDS_RESTART = {"model", "stt", "tts", "voice", "chat_size", "min_silence_ms", "source",
+                 "engine"}
 # device, target, lead_ms and the glossary apply live: the first reopens the mic, the next two
 # only change the prompt and a buffer. "source" sets the recognition language, a CLI flag.
+# "target" is live too -- until it drags the voice with it, which the pipeline loads at start.
 
 SPOKEN = {"en": "English", "zh": "Chinese", "auto": "whatever language the speaker uses"}
 TARGETS = {"en": "English", "zh": "Chinese"}
@@ -56,7 +78,7 @@ LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.
 CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"},
-           "engine": {"cascade", "omni"}}
+           "voice": set(VOICES["zh"]) | set(VOICES["en"]), "engine": {"cascade", "omni"}}
 BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000), "lead_ms": (200, 8000)}
 
 
@@ -146,6 +168,10 @@ def load_config():
                 cfg[key] = value
             elif key in DEFAULTS:
                 print(f"!! ignoring {key}={value!r} in config.json", flush=True)
+    # A config saved before voices existed, or one hand-edited into a mismatch, would ask
+    # Kokoro to read Chinese in an American voice, which comes out as nothing.
+    if cfg["voice"] not in VOICES[cfg["target"]]:
+        cfg["voice"] = DEFAULT_VOICE[cfg["target"]]
     return cfg
 
 
@@ -370,11 +396,17 @@ class Pipeline:
 
     def _command(self):
         c = self.cfg
+        # Only when Kokoro is the voice: the pipeline registers a backend's flags only for
+        # the backend that was selected, so a stray --kokoro_* under Qwen3-TTS is a startup
+        # error. The lang code is the voice name's own first letter, so the phonemiser and
+        # the voice can never disagree.
+        voice = (["--kokoro_voice", c["voice"], "--kokoro_lang_code", c["voice"][0]]
+                 if c["tts"] == "kokoro" else [])
         if c["engine"] == "omni":
             # No STT stage at all: the VAD's audio goes straight to the model, through the
             # proxy above, which is this same HTTP server.
-            return ["speech-to-speech", "serve", "--mac-optimal-settings",
-                    "--stt", "none", "--llm_backend", "chat-completions",
+            return [*LAUNCH, "--mac-optimal-settings",
+                    "--stt", "none", "--llm_backend", "chat-completions", *voice,
                     "--model_name", OMNI_MODEL,
                     "--responses_api_base_url", f"http://127.0.0.1:{HTTP_PORT}/omni/v1",
                     "--tts", c["tts"],
@@ -392,8 +424,8 @@ class Pipeline:
                     "--responses_api_audio_history_turns", "0",
                     "--no_smart_turn",
                     "--speculative_reopen_ms", "0", "--unanswered_reopen_ms", "0"]
-        return ["speech-to-speech", "serve", "--mac-optimal-settings",
-                "--stt", c["stt"], "--language", c["source"], "--tts", c["tts"],
+        return [*LAUNCH, "--mac-optimal-settings",
+                "--stt", c["stt"], "--language", c["source"], "--tts", c["tts"], *voice,
                 "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
                 "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1",
                 # The voice cannot start until the translator hands it a batch, and a batch
@@ -551,6 +583,16 @@ class Pipeline:
         """Returns True when the change needs a pipeline restart to take effect."""
         changed = {k: v for k, v in patch.items()
                    if k in DEFAULTS and v != self.cfg[k] and valid(k, v)}
+        # A voice speaks one language, so it is only ever valid against the target it arrives
+        # with: an American voice handed Chinese text says nothing usable. Switching what
+        # listeners hear therefore carries the voice over with it -- and a voice is loaded
+        # when the pipeline starts, which is what makes this the one target change that
+        # cannot be applied live.
+        target = changed.get("target", self.cfg["target"])
+        if changed.get("voice", self.cfg["voice"]) not in VOICES[target]:
+            changed.pop("voice", None)
+            if self.cfg["voice"] not in VOICES[target]:
+                changed["voice"] = DEFAULT_VOICE[target]
         self.cfg.update(changed)
         CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
         if "device" in changed and self.state == "running":

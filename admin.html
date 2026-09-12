@@ -43,8 +43,9 @@
   #restarthint:not(:empty){margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
   /* A setting the running engine ignores. Dimmed rather than hidden, so switching back does
      not make controls appear out of nowhere. */
-  [data-cascade-only].inert{opacity:.4}
-  [data-cascade-only].inert select,[data-cascade-only].inert input{pointer-events:none}
+  [data-cascade-only].inert,[data-kokoro-only].inert{opacity:.4}
+  [data-cascade-only].inert select,[data-cascade-only].inert input,
+  [data-kokoro-only].inert select{pointer-events:none}
   .grow{flex:1}
   .mark{width:2.15rem;height:2.15rem;flex:0 0 auto;border-radius:.55rem;display:block;
         box-shadow:0 8px 20px var(--shadow)}
@@ -123,6 +124,7 @@
   textarea{min-height:9rem;flex:1;font:.82rem/1.7 var(--mono);resize:vertical}
   .row{display:flex;gap:.8rem;align-items:flex-end}
   .row label{flex:1}
+  .row .narrow{flex:0 1 12rem}          /* a voice name needs far less room than an engine */
   .hint{margin:0;font-size:.8rem;color:var(--dim)}
   .hint.warn{color:var(--warn)}
 
@@ -297,16 +299,23 @@
                 data-en="Qwen3.6 35B — most accurate Bible references; requires 64 GB"></option>
       </select>
     </label>
+    <div class="row">
     <label>
-      <span data-zh="语音" data-tw="語音" data-en="Voice"></span>
+      <span data-zh="语音引擎" data-tw="語音引擎" data-en="Voice engine"></span>
       <select id="tts">
-        <option value="kokoro" data-zh="Kokoro — 速度较快" data-tw="Kokoro — 速度較快"
-                data-en="Kokoro — faster"></option>
+        <option value="kokoro" data-zh="Kokoro — 速度较快，可选声音" data-tw="Kokoro — 速度較快，可選聲音"
+                data-en="Kokoro — faster; choice of voices"></option>
         <option value="qwen3" data-zh="Qwen3-TTS — 音质最佳，速度较慢"
                 data-tw="Qwen3-TTS — 音質最佳，速度較慢"
                 data-en="Qwen3-TTS — highest quality; slower"></option>
       </select>
     </label>
+    <label data-kokoro-only class="narrow">
+      <span data-zh="声音" data-tw="聲音" data-en="Voice"></span>
+      <select id="voice"></select>
+    </label>
+    </div>
+    <p class="hint" id="voicehint"></p>
     <div class="row">
       <label data-cascade-only>
         <span data-zh="上下文（句）" data-tw="上下文（句）" data-en="Context (sentences)"></span>
@@ -377,8 +386,19 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const CFG = ["source", "target", "device", "model", "tts", "chat_size", "min_silence_ms",
-             "lead_ms", "engine"];
+const CFG = ["source", "target", "device", "model", "tts", "voice", "chat_size",
+             "min_silence_ms", "lead_ms", "engine"];
+/* Kokoro's voices, per language listeners hear. Must match VOICES in bridge.py -- the server
+   rejects anything else. Second letter of the name is the gender; the rest is a proper name,
+   which reads the same in all three console languages, so only the gender needs translating. */
+const VOICES = {
+  zh: ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
+       "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
+  en: ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
+       "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+       "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
+       "am_onyx", "am_puck", "am_santa"],
+};
 const LANGS = ["zh", "tw", "en"];
 const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 
@@ -393,7 +413,10 @@ const STR = {
         micsilent:"未侦测到音频输入，请检查线路与所选设备。", micclip:"输入音量过载，请调低音控台的输出电平。",
         direction:"讲道语言为{a}，听众听到{b}。", samelang:"讲道语言与听众语言相同，不会进行翻译。",
         autolang:"讲员语言设为自动侦测。以{b}讲道的内容将不会翻译，听众端为静音。请指定讲道所用语言。",
-        heard:"听到", translated:"翻译" },
+        heard:"听到", translated:"翻译",
+        female:"女声", male:"男声",
+        voicehint:"只提供听众语言的声音。更改后需重启。",
+        qwen3voice:"Qwen3-TTS 只有一种声音，无法选择。" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台連線中斷",
         sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"Qwen3-Omni 直接處理語音，講員語言、語言模型與上下文設定均不適用。", omnilang:"聽眾聽到{b}。講道語言由模型自動偵測。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入。請依貴會需要修改後儲存。",
         copied:"聽眾連結已複製", copyfailed:"複製失敗，請手動選取連結。", cleared:"字幕已清空",
@@ -403,7 +426,10 @@ const STR = {
         micsilent:"未偵測到音訊輸入，請檢查線路與所選裝置。", micclip:"輸入音量過載，請調低音控台的輸出電平。",
         direction:"講道語言為{a}，聽眾聽到{b}。", samelang:"講道語言與聽眾語言相同，不會進行翻譯。",
         autolang:"講員語言設為自動偵測。以{b}講道的內容將不會翻譯，聽眾端為靜音。請指定講道所用語言。",
-        heard:"聽到", translated:"翻譯" },
+        heard:"聽到", translated:"翻譯",
+        female:"女聲", male:"男聲",
+        voicehint:"只提供聽眾語言的聲音。更改後需重啟。",
+        qwen3voice:"Qwen3-TTS 只有一種聲音，無法選擇。" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
         nolink:"console disconnected", sysdefault:"System default", rescanned:"Device list refreshed", omniignores:"Qwen3-Omni processes the audio directly. The spoken language, language model and context settings do not apply.", omnilang:"Listeners hear {b}. The audio model detects the spoken language automatically.", saved:"Saved",
         glossarysaved:"Glossary saved", exampleadded:"Example inserted. Edit it for your congregation, then save.", restarting:"Restarting. Loading the models takes a minute.",
@@ -415,7 +441,10 @@ const STR = {
         micclip:"Input is clipping. Reduce the send level at the mixing desk.",
         direction:"Preached in {a}; listeners hear {b}.", samelang:"Source and target languages are identical. Nothing will be translated.",
         autolang:"Source is set to automatic. Anything preached in {b} is left untranslated and listeners hear silence. Select the language of the sermon.",
-        heard:"HEARD", translated:"TRANSLATED" },
+        heard:"HEARD", translated:"TRANSLATED",
+        female:"female", male:"male",
+        voicehint:"Only voices that speak the listeners' language are offered. Takes effect after restarting.",
+        qwen3voice:"Qwen3-TTS has one voice; there is nothing to choose." },
 };
 
 /* Same storage contract as slashai.app, so the choice matches the rest of the site. */
@@ -515,6 +544,24 @@ function paint() {
     el.querySelectorAll("select,input").forEach((f) => { f.disabled = omni; });
   });
   $("enginehint").textContent = omni ? t("omniignores") : "";
+
+  // A Kokoro voice only speaks its own language, so the list follows what listeners hear.
+  // Rebuilt only when that (or the console language) changes: a <select> rebuilt under the
+  // operator's cursor closes itself mid-choice.
+  const kokoro = s.config.tts === "kokoro";
+  const voiceKey = s.config.target + lang;
+  if ($("voice").dataset.built !== voiceKey) {
+    $("voice").dataset.built = voiceKey;
+    $("voice").innerHTML = VOICES[s.config.target].map((v) => {
+      const name = v.slice(3).replace(/^./, (c) => c.toUpperCase());
+      return `<option value="${v}">${name} · ${t(v[1] === "f" ? "female" : "male")}</option>`;
+    }).join("");
+  }
+  document.querySelectorAll("[data-kokoro-only]").forEach((el) => {
+    el.classList.toggle("inert", !kokoro);
+    el.querySelectorAll("select").forEach((f) => { f.disabled = !kokoro; });
+  });
+  $("voicehint").textContent = kokoro ? t("voicehint") : t("qwen3voice");
 
   const same = s.config.source === s.config.target;
   // "auto" is not equal to the target but can turn out to be it, and the translator is told

@@ -57,7 +57,8 @@ cd ~                                    # not Documents, Desktop or Downloads �
 git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install speech-to-speech segno      # segno is optional, only for the QR code
+pip install speech-to-speech 'misaki[zh]' segno   # misaki[zh] is Kokoro's Chinese
+                                                  # voices; segno draws the QR code
 ```
 
 The omni engine is optional and needs a second environment, because `mlx-vlm` pulls a newer
@@ -79,7 +80,7 @@ hard-codes its own path:
 ```bash
 mv ~/Documents/inplace-translation ~/inplace-translation && cd ~/inplace-translation
 rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate
-pip install speech-to-speech segno      # quick: pip still has the wheels cached
+pip install speech-to-speech 'misaki[zh]' segno   # quick: the wheels are still cached
 ```
 
 Approving the Terminal prompt works just as well; moving the folder simply means there is no
@@ -235,8 +236,15 @@ All of this lives in the console; the notes below are why each one is there.
   rather than translating it.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
-- **Voice** — Kokoro keeps up with the preacher and is the default. Qwen3-TTS sounds better;
-  switch to it if the room can spare the speed, and back if `!! backlog, dropping audio` appears.
+- **Voice engine** — Kokoro keeps up with the preacher and is the default. Qwen3-TTS sounds
+  better; switch to it if the room can spare the speed, and back if `!! backlog, dropping
+  audio` appears.
+- **Voice** — Kokoro only. Eight Mandarin voices and twenty American English ones, female and
+  male; Qwen3-TTS has one voice of its own and the setting greys out. The list follows what
+  listeners hear, because a voice comes with the phonemiser for its own language and an
+  American voice handed Chinese text reads it as the words "Chinese letter", once per
+  character. Changing what listeners hear therefore changes the voice too, and needs a
+  restart — the prompt can change mid-service, a loaded voice cannot.
 - **Voice buffer** — the model and the voice take turns on the one GPU, so the voice arrives
   in gusts. The bridge buffers this much of it before playing, which is heard as delay rather
   than as stuttering. Raise it if the audio chops, lower it if the voice lags too far behind

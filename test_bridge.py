@@ -325,13 +325,34 @@ p1.mic = None
 p1.cfg = dict(bridge.DEFAULTS)
 
 assert p1.update({"source": "auto"}) is True, "spoken language should need a restart"
-assert p1.update({"target": "en"}) is False, "target only changes the prompt"
+
+# a voice speaks one language. Sending listeners to the other one carries the voice with it,
+# and a voice is loaded at startup -- so that target change, unlike a plain one, restarts.
+assert p1.update({"target": "en"}) is True, "an en target cannot keep a Chinese voice"
+assert p1.cfg["voice"] == bridge.DEFAULT_VOICE["en"], f"kept {p1.cfg['voice']}"
+assert p1.update({"voice": "am_michael"}) is True, "a voice is loaded when the pipeline starts"
+assert p1.update({"target": "zh"}) is True and p1.cfg["voice"] == bridge.DEFAULT_VOICE["zh"]
+assert p1.update({"voice": "am_michael"}) is False, "an American voice reading Chinese"
+assert p1.update({"voice": "zf_yunfei"}) is False, "a voice Kokoro does not ship"
+
+# the voice reaches Kokoro together with its own phonemiser, and only when Kokoro is the
+# engine: the pipeline registers --kokoro_* only for the backend that was selected, and
+# rejects the flag outright under Qwen3-TTS.
+p1.cfg = dict(bridge.DEFAULTS, voice="zm_yunxi")
+cmd = p1._command()
+assert cmd[cmd.index("--kokoro_voice") + 1] == "zm_yunxi"
+assert cmd[cmd.index("--kokoro_lang_code") + 1] == "z", "English phonemes for Chinese text"
+p1.cfg["tts"] = "qwen3"
+assert "--kokoro_voice" not in p1._command(), "a flag Qwen3-TTS refuses to start with"
+p1.cfg = dict(bridge.DEFAULTS)
 
 # a hand-edited config.json with a bad value falls back instead of crashing at startup
 bridge.CONFIG_PATH.write_text(json.dumps({"source": "klingon", "target": "en", "chat_size": 3}))
 loaded = bridge.load_config()
 assert loaded["source"] == bridge.DEFAULTS["source"], "bad value survived load"
 assert loaded["target"] == "en" and loaded["chat_size"] == 3, "good values were dropped"
+# ...including a config saved before voices existed, whose default voice speaks the wrong one
+assert loaded["voice"] == bridge.DEFAULT_VOICE["en"], f"loaded {loaded['voice']}"
 
 # a config written before 简体/繁體 was dropped still starts, quietly, on the same language
 for legacy in ("zh-Hans", "zh-Hant"):

@@ -52,6 +52,13 @@ const cascadeOnly = [...src.matchAll(/<label data-cascade-only>/g)].map(() => {
   label.querySelectorAll = () => [field];
   return label;
 });
+// The voice picker, dimmed when the engine that has voices to pick is not the one running.
+const kokoroOnly = [...src.matchAll(/<label data-kokoro-only[^>]*>/g)].map(() => {
+  const label = el("label");
+  label.children.push(byId.voice);
+  label.querySelectorAll = () => [byId.voice];
+  return label;
+});
 // options carry data- attributes too, so language switching must reach them
 const dataEls = [...attrEls, ...Object.values(byId)];
 
@@ -64,6 +71,7 @@ const sandbox = {
     getElementById: (i) => byId[i] ?? el(),
     querySelector: () => el(),
     querySelectorAll: (sel) => (sel === "[data-cascade-only]" ? cascadeOnly
+      : sel === "[data-kokoro-only]" ? kokoroOnly
       : sel === "[data-en]" ? dataEls
       : sel.startsWith("#langseg") ? [el("button"), el("button"), el("button")] : []),
     createElement: (t) => el(t),
@@ -102,8 +110,8 @@ const status = {
   state: "running", detail: "translating",
   config: { device: null, source: "en", target: "zh",
             model: "mlx-community/Qwen3-4B-Instruct-2507-4bit", stt: "mlx-audio-whisper",
-            tts: "qwen3", chat_size: 2, min_silence_ms: 64, lead_ms: 1500,
-            engine: "cascade" },
+            tts: "qwen3", voice: "zf_xiaoxiao", chat_size: 2, min_silence_ms: 64,
+            lead_ms: 1500, engine: "cascade" },
   listeners: 3, level: 0.42,
   url: "http://192.168.1.50:8000/",
 };
@@ -188,6 +196,23 @@ if (!byId.enginehint.textContent) errors.push("nothing explained why those went 
 listeners.status({ data: JSON.stringify(status) });
 if (cascadeOnly.some((l) => l.classList.contains("inert")))
   errors.push("switching back to the cascade left its own settings dimmed");
+
+// A Kokoro voice speaks one language, so the picker holds the target's voices and no
+// others. Qwen3-TTS has a single voice of its own: nothing to pick, so the control goes grey.
+const voiceOptions = () => (byId.voice.innerHTML.match(/value="[^"]+"/g) ?? [])
+  .map((m) => m.slice(7, -1));
+if (!kokoroOnly.every((l) => l.classList.contains("inert")))
+  errors.push("the voice picker stayed live under an engine with one voice");
+listeners.status({ data: JSON.stringify({ ...status, config: { ...status.config, tts: "kokoro" } }) });
+if (kokoroOnly.some((l) => l.classList.contains("inert")))
+  errors.push("the voice picker was dimmed while Kokoro was running");
+if (!voiceOptions().every((v) => v.startsWith("z")) || voiceOptions().length !== 8)
+  errors.push(`Chinese listeners were offered ${JSON.stringify(voiceOptions())}`);
+listeners.status({ data: JSON.stringify({
+  ...status, config: { ...status.config, tts: "kokoro", target: "en", voice: "af_heart" } }) });
+if (!voiceOptions().every((v) => v.startsWith("a")) || voiceOptions().length !== 20)
+  errors.push(`English listeners were offered ${JSON.stringify(voiceOptions())}`);
+if (!byId.voicehint.textContent) errors.push("nothing explained which voices are offered");
 
 if (errors.length) {
   console.error("console script failed:\n  " + errors.join("\n  "));
