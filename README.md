@@ -31,7 +31,8 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 |---|---|
 | Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Qwen3-TTS is ~7.5 GB of weights, plus caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
-| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv |
+| Book names right | **64 GB+**, which buys the 35 B — the only one that gets 约翰二书 right |
+| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv. The 35 B adds 35 GB on top |
 
 Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
 MLX inference; on battery the Mac throttles and the translation falls behind.
@@ -196,7 +197,10 @@ All of this lives in the console; the notes below are why each one is there.
   need English→Chinese and Chinese→English simultaneously, run a second copy of the repo on
   another port with the directions reversed, and hand out two QR codes.
 - **Language model** — 4B is the floor for sermon register. On a 24 GB+ Mac pick the 8B; the
-  difference is visible. Watch for backlog warnings afterwards — a bigger model is a slower one.
+  difference is visible. On 64 GB+ pick Qwen3.6 35B-A3B, which is the only one that gets Bible
+  book names consistently right (see above). Watch for backlog warnings afterwards — a bigger
+  model is usually a slower one, though the 35B is a mixture-of-experts and costs far less
+  than its size suggests: 0.5 s a sentence against the 8B's 0.3 s.
 - **Context** — 2 sentences keeps pronouns and topic consistent without letting an hour of
   sermon fill the context window. Drop to 0 if the model starts chatting back.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
@@ -220,17 +224,20 @@ All of this lives in the console; the notes below are why each one is there.
 - **A preacher who never pauses will drift.** TTS output is roughly as long as the input, so
   there's no slack to catch up. Past 20 s of backlog `bridge.py` drops audio and resyncs to
   live — a listener hears a gap, not an ever-growing delay.
-- **It will mistranslate.** Local 4–8B models get theology wrong in interesting ways. Treat
-  it as a hearing aid for visitors, not as the sermon of record.
+- **It will mistranslate.** Local models get theology wrong in interesting ways, the small
+  ones spectacularly so. The 35B is the most reliable of the three and is still a local model.
+  Treat it as a hearing aid for visitors, not as the sermon of record.
 
 ## Where the models live
 
 The first run downloads about 6.6 GB into your home directory, not into the project folder,
-so deleting the repo reclaims none of it.
+so deleting the repo reclaims none of it. Switching the translator in the console downloads
+that model too, the first time you select it: the 8B is 4.3 GB and the 35B is 35 GB, and
+neither replaces what is already there.
 
 | | |
 |---|---|
-| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~6.6 GB |
+| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~6.6 GB, plus any translator you switched to |
 | `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
 
 To clear them, activate this project's environment and remove them by name:
@@ -241,7 +248,12 @@ hf cache ls                    # what is cached, and how big
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
             model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
-            model/mlx-community/whisper-large-v3-turbo \
+            model/mlx-community/whisper-large-v3-turbo
+
+# only if you switched the translator in the console, or ran a version that
+# used Smart Turn; hf cache ls above shows which of these you actually have
+hf cache rm model/mlx-community/Qwen3-8B-4bit \
+            model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/pipecat-ai/smart-turn-v3
 
 hf cache prune                 # half-finished downloads

@@ -20,7 +20,9 @@ MP3_CHUNK = 256                   # one mp3 frame at this bitrate and rate, in b
                                   # 1024 held four frames back: 303 ms before the first byte
                                   # left the encoder, against 124 ms a frame at a time.
 MAX_QUEUED = 10 * BITRATE // 8 // MP3_CHUNK   # ~10 s buffered per listener before eviction
-LOAD_TIMEOUT_S = 900              # first run downloads ~6.6 GB before the port answers
+LOAD_TIMEOUT_S = 3600             # the port stays shut until the models are downloaded, and
+                                  # the 35B option is a 35 GB first run. A pipeline that dies
+                                  # is caught by poll(), so this only backstops a live hang.
 
 CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
@@ -267,7 +269,8 @@ class Pipeline:
         try:
             if not port_open(S2S_PORT):
                 self.proc = subprocess.Popen(self._command(), cwd=HERE)
-                self._set("starting", "loading models (first run downloads ~6.6 GB)")
+                size = "35 GB" if "35B" in self.cfg["model"] else "6.6 GB"
+                self._set("starting", f"loading models (first run downloads ~{size})")
                 deadline = time.monotonic() + LOAD_TIMEOUT_S
                 while not port_open(S2S_PORT):
                     if self.proc.poll() is not None:
