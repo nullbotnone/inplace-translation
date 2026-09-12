@@ -230,6 +230,16 @@ assert saved["device"] == "AirPods Pro" and saved["chat_size"] == 4 and saved["m
 assert "nonsense" not in saved, "unknown key reached the config file"
 assert set(saved) == set(bridge.DEFAULTS), "config file shape drifted from DEFAULTS"
 
+# the QR has to scale to whatever box the console gives it. A fixed width and no viewBox
+# gets clipped by max-width rather than resized, which is what knocked it off centre.
+try:                                   # segno is optional, exactly as it is in bridge.py
+    import segno
+    qr = segno.make("http://192.168.1.50:8000/").svg_inline(scale=6, omitsize=True)
+    assert "viewBox=" in qr, "no viewBox: the QR cannot scale"
+    assert "width=" not in qr.split(">")[0], "a fixed width will clip inside max-width"
+except ImportError:
+    print("(skipping the QR check: segno is not installed)")
+
 # an isolated church LAN with no route to the internet must not break the status page
 real_probe, real_resolve = bridge._probe_route, socket.gethostbyname
 def unreachable(*a, **k): raise OSError("Network is unreachable")

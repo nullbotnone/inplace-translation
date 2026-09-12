@@ -594,7 +594,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/qr.svg":
             try:
                 import segno
-                body = segno.make(pipeline.status()["url"]).svg_inline(scale=6).encode()
+                # omitsize gives a viewBox and no width/height: without it the svg carries
+                # a fixed 198px and the console's max-width clips it instead of scaling it,
+                # which is what pushed the code off-centre in its white box.
+                body = segno.make(pipeline.status()["url"]).svg_inline(
+                    scale=6, omitsize=True).encode()
             except ImportError:
                 return self.send_error(404, "pip install segno for a QR code")
             self.send_response(200)
