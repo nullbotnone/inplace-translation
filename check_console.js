@@ -17,7 +17,9 @@ function el(tag = "div") {
   const e = {
     tag, dataset: {}, style: {}, children: [], value: "", innerHTML: "",
     className: "", placeholder: "", disabled: false, type: "",
-    classList: { add() {}, remove() {}, contains: () => false },
+    classList: { on: new Set(), add(c) { this.on.add(c); }, remove(c) { this.on.delete(c); },
+                 toggle(c, want) { want ? this.on.add(c) : this.on.delete(c); },
+                 contains(c) { return this.on.has(c); } },
     setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; },
     appendChild(c) { c.parent = this; this.children.push(c); return c; },
     append(...c) { c.forEach((x) => { x.parent = this; }); this.children.push(...c); },
@@ -41,6 +43,15 @@ function el(tag = "div") {
 }
 
 const byId = Object.fromEntries(ids.map((i) => [i, el()]));
+// Labels the script dims when the running engine ignores them. Each carries one field, which
+// is what the script disables -- an engine-dependent control is exactly what needs covering.
+const cascadeOnly = [...src.matchAll(/<label data-cascade-only>/g)].map(() => {
+  const field = el("select");
+  const label = el("label");
+  label.children.push(field);
+  label.querySelectorAll = () => [field];
+  return label;
+});
 // options carry data- attributes too, so language switching must reach them
 const dataEls = [...attrEls, ...Object.values(byId)];
 
@@ -52,7 +63,8 @@ const sandbox = {
     activeElement: null,
     getElementById: (i) => byId[i] ?? el(),
     querySelector: () => el(),
-    querySelectorAll: (sel) => (sel === "[data-en]" ? dataEls
+    querySelectorAll: (sel) => (sel === "[data-cascade-only]" ? cascadeOnly
+      : sel === "[data-en]" ? dataEls
       : sel.startsWith("#langseg") ? [el("button"), el("button"), el("button")] : []),
     createElement: (t) => el(t),
     addEventListener() {},
@@ -88,9 +100,10 @@ try {
 // a status event exactly as bridge.py's Pipeline.status() builds it
 const status = {
   state: "running", detail: "translating",
-  config: { device: null, source: "en", target: "zh-Hans",
+  config: { device: null, source: "en", target: "zh",
             model: "mlx-community/Qwen3-4B-Instruct-2507-4bit", stt: "mlx-audio-whisper",
-            tts: "qwen3", chat_size: 2, min_silence_ms: 64 },
+            tts: "qwen3", chat_size: 2, min_silence_ms: 64, lead_ms: 1500,
+            engine: "cascade" },
   listeners: 3, level: 0.42,
   url: "http://192.168.1.50:8000/",
 };
@@ -155,6 +168,26 @@ if (typeof themeClick !== "function") {
     }
   }
 }
+
+// The audio engine hears the sermon itself: no recogniser to give a language to, no
+// translator to pick, no history. Those controls must go inert rather than sit there live.
+if (cascadeOnly.length < 3) errors.push(`expected the cascade-only controls, found ${cascadeOnly.length}`);
+if (cascadeOnly.some((l) => l.classList.contains("inert")))
+  errors.push("cascade settings were dimmed while the cascade is running");
+try {
+  listeners.status({ data: JSON.stringify({ ...status, config: { ...status.config, engine: "omni" } }) });
+} catch (e) {
+  errors.push(`on the omni status: ${e.message}`);
+}
+if (!cascadeOnly.every((l) => l.classList.contains("inert")))
+  errors.push("a setting the audio engine ignores was left live");
+if (!cascadeOnly.every((l) => l.querySelectorAll()[0].disabled))
+  errors.push("a setting the audio engine ignores was left editable");
+if (!byId.enginehint.textContent) errors.push("nothing explained why those went grey");
+// and back again: switching engines must restore them
+listeners.status({ data: JSON.stringify(status) });
+if (cascadeOnly.some((l) => l.classList.contains("inert")))
+  errors.push("switching back to the cascade left its own settings dimmed");
 
 if (errors.length) {
   console.error("console script failed:\n  " + errors.join("\n  "));

@@ -37,6 +37,10 @@
               padding:.75rem clamp(1rem,3vw,2rem);border-block:1px solid var(--line);
               background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px)}
   .actions-inline{margin-top:.7rem;gap:.5rem}
+  /* A setting the running engine ignores. Dimmed rather than hidden, so switching back does
+     not make controls appear out of nowhere. */
+  [data-cascade-only].inert{opacity:.4}
+  [data-cascade-only].inert select,[data-cascade-only].inert input{pointer-events:none}
   .grow{flex:1}
   .mark{width:1.9rem;height:1.9rem;flex:0 0 auto;border-radius:.45rem;display:block}
 
@@ -186,7 +190,7 @@
 
   <section class="card">
     <h2 data-zh="讲道语言" data-tw="講道語言" data-en="Sermon languages"></h2>
-    <label>
+    <label data-cascade-only>
       <span data-zh="讲员说的语言" data-tw="講員說的語言" data-en="The preacher speaks"></span>
       <select id="source">
         <option value="en" data-zh="英文" data-tw="英文" data-en="English"></option>
@@ -227,6 +231,17 @@
   <section class="card quality">
     <h2 data-zh="翻译质量" data-tw="翻譯品質" data-en="Translation quality"></h2>
     <label>
+      <span data-zh="引擎" data-tw="引擎" data-en="Engine"></span>
+      <select id="engine">
+        <option value="cascade" data-zh="Whisper + 翻译模型 → 语音（稳定，主日用这个）"
+                data-tw="Whisper + 翻譯模型 → 語音（穩定，主日用這個）"
+                data-en="Whisper + a translator → speech (steady; use this on a Sunday)"></option>
+        <option value="omni" data-zh="Qwen3-Omni 30B — 语音直入，省去识别（实验，需 64 GB）"
+                data-tw="Qwen3-Omni 30B — 語音直入，省去辨識（實驗，需 64 GB）"
+                data-en="Qwen3-Omni 30B — audio straight in, no recogniser (experimental, 64 GB)"></option>
+      </select>
+    </label>
+    <label data-cascade-only>
       <span data-zh="语言模型" data-tw="語言模型" data-en="Language model"></span>
       <select id="model">
         <option value="mlx-community/Qwen3-4B-Instruct-2507-4bit"
@@ -241,17 +256,7 @@
                 data-en="Qwen3.6 35B — reliable book names, needs 64 GB"></option>
       </select>
     </label>
-    <label>
-      <span data-zh="引擎" data-tw="引擎" data-en="Engine"></span>
-      <select id="engine">
-        <option value="cascade" data-zh="Whisper + 翻译模型 → 语音（稳定，主日用这个）"
-                data-tw="Whisper + 翻譯模型 → 語音（穩定，主日用這個）"
-                data-en="Whisper + a translator → speech (steady; use this on a Sunday)"></option>
-        <option value="omni" data-zh="Qwen3-Omni 30B — 语音直入，省去识别（实验，需 64 GB）"
-                data-tw="Qwen3-Omni 30B — 語音直入，省去辨識（實驗，需 64 GB）"
-                data-en="Qwen3-Omni 30B — audio straight in, no recogniser (experimental, 64 GB)"></option>
-      </select>
-    </label>
+    <p class="hint" id="enginehint"></p>
     <label>
       <span data-zh="语音" data-tw="語音" data-en="Voice"></span>
       <select id="tts">
@@ -263,7 +268,7 @@
       </select>
     </label>
     <div class="row">
-      <label>
+      <label data-cascade-only>
         <span data-zh="上下文（句）" data-tw="上下文（句）" data-en="Context (sentences)"></span>
         <input type="number" id="chat_size" min="0" max="8">
       </label>
@@ -340,7 +345,7 @@ const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 /* Strings the server or the meters produce at runtime, which no data- attribute can carry. */
 const STR = {
   zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台断开",
-        sysdefault:"系统默认", rescanned:"设备已重新扫描", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
+        sysdefault:"系统默认", rescanned:"设备已重新扫描", omniignores:"语音直入模式下，讲员语言、语言模型、上下文都用不到——模型自己听、自己判断。", omnilang:"听众听到{b}。讲员说什么语言由模型自己判断。", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
         copied:"听众链接已复制", copyfailed:"无法复制 — 请手动选择链接", cleared:"字幕已清空",
         requestfailed:"操作失败 — 请检查控制台连接", glossarycount:"{n} 个字符",
         restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
@@ -350,7 +355,7 @@ const STR = {
         autolang:"讲员语言设为「自动」：凡是用{b}讲的都不会翻译，听众那边是静音。讲道用哪种语言就选哪种。",
         heard:"听到", translated:"翻译" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
-        sysdefault:"系統預設", rescanned:"裝置已重新掃描", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
+        sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"語音直入模式下，講員語言、語言模型、上下文都用不到——模型自己聽、自己判斷。", omnilang:"聽眾聽到{b}。講員說什麼語言由模型自己判斷。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
         copied:"聽眾連結已複製", copyfailed:"無法複製 — 請手動選取連結", cleared:"字幕已清空",
         requestfailed:"操作失敗 — 請檢查控制台連線", glossarycount:"{n} 個字元",
         restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
@@ -360,7 +365,7 @@ const STR = {
         autolang:"講員語言設為「自動」：凡是用{b}講的都不會翻譯，聽眾那邊是靜音。講道用哪種語言就選哪種。",
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
-        nolink:"no console link", sysdefault:"System default", rescanned:"Device list refreshed", saved:"Saved",
+        nolink:"no console link", sysdefault:"System default", rescanned:"Device list refreshed", omniignores:"Qwen3-Omni hears the sermon itself, so the spoken language, the language model and the context setting are not used.", omnilang:"Listeners hear {b}. The audio model works out what the preacher is speaking on its own.", saved:"Saved",
         glossarysaved:"Glossary saved", exampleadded:"Example added — edit it for your church, then save", restarting:"Restarting — models take a minute",
         copied:"Listener link copied", copyfailed:"Could not copy — select the link manually", cleared:"Transcript cleared",
         requestfailed:"Action failed — check the console connection", glossarycount:"{n} characters",
@@ -460,14 +465,25 @@ function paint() {
   if (!s) return;
 
   const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
+  // Qwen3-Omni hears the audio itself: no recogniser to give a language to, no translator
+  // model to choose, and it runs without history. Leaving those live invites the operator to
+  // set something that does nothing.
+  const omni = s.config.engine === "omni";
+  document.querySelectorAll("[data-cascade-only]").forEach((el) => {
+    el.classList.toggle("inert", omni);
+    el.querySelectorAll("select,input").forEach((f) => { f.disabled = omni; });
+  });
+  $("enginehint").textContent = omni ? t("omniignores") : "";
+
   const same = s.config.source === s.config.target;
   // "auto" is not equal to the target but can turn out to be it, and the translator is told
   // to stay silent on anything already in the target language. That reads as a dead system.
   const maybeSame = !same && s.config.source === "auto";
-  $("langhint").textContent = same ? t("samelang")
+  $("langhint").textContent = omni ? t("omnilang").replace("{b}", into)
+    : same ? t("samelang")
     : maybeSame ? t("autolang").replace("{b}", into)
     : t("direction").replace("{a}", from).replace("{b}", into);
-  $("langhint").className = "hint" + (same || maybeSame ? " warn" : "");
+  $("langhint").className = "hint" + (!omni && (same || maybeSame) ? " warn" : "");
 
   $("detail").textContent = s.detail || "";
   $("listeners").textContent = s.listeners;
