@@ -37,7 +37,7 @@ DEFAULTS = {
     "target": "zh",                                              # what listeners hear
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
     "stt": "mlx-audio-whisper",
-    "tts": "qwen3",
+    "tts": "kokoro",
     "chat_size": 2,
     "min_silence_ms": 64,
     "lead_ms": 1500,                                             # voice buffered before it plays
