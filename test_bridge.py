@@ -168,6 +168,12 @@ cmd = p0._command()
 assert cmd[cmd.index("--stream_batch_sentences") + 1] == "1", "the voice waits on 3 sentences"
 assert "--no_compact_history" in cmd, "a background LLM call still contends for the GPU"
 
+# and a turn has to commit at the pause. Left to reopen, a sermon's pauses are all shorter
+# than the 7 s reopen window, so nothing is spoken until the preacher stops for good
+assert "--no_smart_turn" in cmd, "smart turn holds the turn open for a pausing speaker"
+assert cmd[cmd.index("--speculative_reopen_ms") + 1] == "0", "the turn still reopens"
+assert cmd[cmd.index("--unanswered_reopen_ms") + 1] == "0", "the turn still reopens"
+
 # junk never reaches a CLI flag or a dict lookup
 p1 = bridge.Pipeline()
 for bad in ({"source": "klingon"}, {"target": "zh-Hanzi"}, {"tts": "; rm -rf /"},

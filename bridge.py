@@ -298,7 +298,18 @@ class Pipeline:
                 # Otherwise every turn past chat_size fires a background LLM call to summarise
                 # the history -- on the same GPU lock the voice is waiting for, to produce a
                 # summary this prompt tells the model to ignore. Evict the old turn instead.
-                "--no_compact_history"]
+                "--no_compact_history",
+                # The big one. These three keep a turn open across a pause so a person
+                # thinking mid-sentence is not cut off: an uncommitted turn reopens for
+                # max(speculative_reopen_ms, unanswered_reopen_ms, smart_turn_max_wait_ms)
+                # = 7 s by default. Sermon pauses are shorter than that, so every sentence
+                # reopened the same turn and nothing was translated or spoken until the
+                # preacher stopped for seven seconds -- and each reopen re-spoke the whole
+                # turn from the top. A preacher is not waiting for a reply; commit at the
+                # pause. Measured on a 15 s sample: first audio at 4.3 s instead of 15.6 s,
+                # and 11.6 s of speech synthesised instead of 28 s.
+                "--no_smart_turn",
+                "--speculative_reopen_ms", "0", "--unanswered_reopen_ms", "0"]
 
     def stop(self):
         if self.mic:

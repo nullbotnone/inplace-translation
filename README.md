@@ -201,9 +201,10 @@ All of this lives in the console; the notes below are why each one is there.
 
 ## What this is not
 
-- **It lags 3–8 s.** Turn-based: nothing is translated until the preacher pauses, then STT +
-  LLM + TTS + the phone's MP3 buffer all stack up. Fine for preaching, useless for
-  back-and-forth Q&A. Tell listeners to use headphones and not to expect lip-sync.
+- **It lags 2–4 s.** Turn-based: nothing is translated until the preacher pauses, then STT +
+  LLM + TTS + the voice buffer + the phone's MP3 buffer all stack up. Fine for preaching,
+  useless for back-and-forth Q&A. Tell listeners to use headphones and not to expect
+  lip-sync. On a 15 s sample the first words came out 1 s after the first pause.
 - **Subtitles arrive before the audio they narrate**, by a second or two — the text exists as
   soon as the LLM finishes, the voice has to be synthesised and buffered. Nothing lines them
   up; reading ahead of the voice is the intended behaviour, not a bug to fix.
