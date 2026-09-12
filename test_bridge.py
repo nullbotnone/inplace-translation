@@ -198,7 +198,8 @@ class FakeSD:
     @staticmethod
     def RawInputStream(**kw):
         FakeSD.opened = kw["device"]
-        return type("S", (), {"start": lambda self: None, "close": lambda self: None})()
+        return type("S", (), {"start": lambda self: None, "close": lambda self: None,
+                              "active": True})()
 
 sys.modules["sounddevice"] = FakeSD
 p1.open_mic()
@@ -257,6 +258,101 @@ bridge._ip_cache = (0.0, "127.0.0.1")
 assert bridge.lan_ip() == "192.168.1.50"
 assert bridge.lan_ip() == "192.168.1.50", "second call should come from the cache"
 bridge._probe_route, socket.gethostbyname = real_probe, real_resolve
+
+# a mic that vanishes mid-sermon -- AirPods wandering off, a USB box unplugged -- leaves the
+# stream open and mute. Silence in the room still produces callbacks; a dead device does not.
+class DeadMic:
+    active = False
+    def start(self): pass
+    def close(self): pass
+
+p3 = bridge.Pipeline()
+p3.cfg = dict(bridge.DEFAULTS)
+# ws stands for "the pipeline is up"; check_mic uses it to tell a dead device from a
+# deliberate shutdown, so a running pipeline has one
+p3.state, p3.ws, p3.mic, p3.last_cb = "running", object(), DeadMic(), time.monotonic()
+sys.modules["sounddevice"] = FakeSD
+p3.check_mic()
+assert p3.mic is not None and not isinstance(p3.mic, DeadMic), "a dead stream was not reopened"
+assert p3.state == "running", "reopening should not put the pipeline in error"
+
+# a live stream that stopped calling back is just as dead, whatever PortAudio claims
+stale = type("S", (), {"active": True, "start": lambda s: None, "close": lambda s: None})()
+p3.mic, p3.last_cb = stale, time.monotonic() - bridge.MIC_DEAD_S - 1
+p3.check_mic()
+assert p3.mic is not stale, "a stream that stopped calling back was left in place"
+
+# a quiet room is not a dead mic: callbacks keep arriving, so nothing should be touched
+still = type("S", (), {"active": True, "start": lambda s: None, "close": lambda s: None})()
+p3.mic, p3.last_cb, p3.level = still, time.monotonic(), 0.0
+p3.check_mic()
+assert p3.mic is still, "silence was mistaken for a dead microphone"
+
+# and when it cannot be reopened at all, say so instead of translating silence forever
+class NoDevices:
+    @staticmethod
+    def query_devices(): return []
+    @staticmethod
+    def RawInputStream(**kw): raise OSError("no such device")
+sys.modules["sounddevice"] = NoDevices
+p3.mic, p3.last_cb = None, 0.0
+p3.check_mic()
+assert p3.state == "error" and "microphone" in p3.detail, f"stayed running, deaf: {p3.state}"
+p3.check_mic()                      # and does not loop: state is no longer "running"
+del sys.modules["sounddevice"]
+p3.mic = None
+
+# stop() must not be undone by the watchdog: it closes the mic, then spends up to 15 s
+# terminating the pipeline, and for all of that the state still says "running"
+p3.state, p3.ws = "running", object()
+shutting_down = DeadMic()
+p3.mic, p3.last_cb = shutting_down, 0.0
+sys.modules["sounddevice"] = FakeSD
+FakeSD.opened = "sentinel"
+p3.ws = None                                  # what stop() leaves behind
+p3.check_mic()
+assert p3.mic is shutting_down, "the watchdog stepped in while the pipeline was shutting down"
+assert FakeSD.opened == "sentinel", "open_mic was called during shutdown"
+
+# rescan() tears PortAudio down and builds it again. For that moment there is no mic, and
+# the watchdog must not try to open one against a dead PortAudio -- that turns a routine
+# device rescan into an error state mid-sermon.
+order = []
+class SlowSD:
+    """PortAudio, with the teardown slow enough to land the watchdog inside it."""
+    @staticmethod
+    def _terminate(): order.append("terminate"); time.sleep(.3)
+    @staticmethod
+    def _initialize(): order.append("initialize")
+    @staticmethod
+    def query_devices(kind=None): return [{"name": "MacBook Pro Microphone", "max_input_channels": 1}]
+    @staticmethod
+    def RawInputStream(**kw):
+        order.append("open")
+        return type("S", (), {"start": lambda s: None, "close": lambda s: None, "active": True})()
+
+sys.modules["sounddevice"] = SlowSD
+saved_pipeline, bridge.pipeline = bridge.pipeline, p3
+p3.state, p3.ws, p3.last_cb = "running", object(), 0.0
+p3.mic = type("S", (), {"start": lambda s: None, "close": lambda s: None, "active": True})()
+th = threading.Thread(target=bridge.rescan)
+watcher = threading.Thread(target=lambda: (time.sleep(.1), p3.check_mic()))
+th.start(); watcher.start(); th.join(3); watcher.join(3)
+bridge.pipeline = saved_pipeline
+# every open must fall after PortAudio came back, never between terminate and initialize
+assert "open" in order, f"the mic was never reopened: {order}"
+assert order.index("initialize") < order.index("open"), \
+    f"the watchdog opened a stream against a torn-down PortAudio: {order}"
+
+# the heartbeat is the mic watchdog as well as the meters; it must not die on one exception
+beats = []
+saved_pipeline, bridge.pipeline = bridge.pipeline, type("P", (), {
+    "check_mic": lambda self: (beats.append(1), 1 / 0)[0], "status": lambda self: {}})()
+hb = threading.Thread(target=bridge.heartbeat, daemon=True)
+hb.start(); time.sleep(1.6); bridge.pipeline = saved_pipeline
+assert len(beats) >= 2, f"the heartbeat died on the first exception: {len(beats)} beats"
+p3.state, p3.ws, p3.mic = "stopped", None, None
+del sys.modules["sounddevice"]
 
 # a dying encoder has to surface: both encoder threads are daemons nobody watches
 p2 = bridge.Pipeline()

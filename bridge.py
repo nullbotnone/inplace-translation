@@ -20,6 +20,7 @@ MP3_CHUNK = 256                   # one mp3 frame at this bitrate and rate, in b
                                   # 1024 held four frames back: 303 ms before the first byte
                                   # left the encoder, against 124 ms a frame at a time.
 MAX_QUEUED = 10 * BITRATE // 8 // MP3_CHUNK   # ~10 s buffered per listener before eviction
+MIC_DEAD_S = 3                    # no callback for this long means the input is gone
 LOAD_TIMEOUT_S = 3600             # the port stays shut until the models are downloaded, and
                                   # the 35B option is a 35 GB first run. A pipeline that dies
                                   # is caught by poll(), so this only backstops a live hang.
@@ -244,7 +245,13 @@ class Pipeline:
         self.detail = ""
         self.proc = self.ws = self.mic = None
         self.level = 0.0            # most recent mic peak, 0..1
+        self.last_cb = 0.0          # when the mic last handed us a block
         self.lock = threading.Lock()
+        # Three threads open and close the mic now -- the console's thread through update()
+        # and rescan(), the heartbeat through check_mic(), and startup -- and PortAudio is
+        # torn right down and rebuilt in the middle of a rescan. Reentrant because both
+        # check_mic() and rescan() go on to call open_mic().
+        self.mic_lock = threading.RLock()
 
     # ---------------------------------------------------------------- status
     def status(self):
@@ -319,15 +326,20 @@ class Pipeline:
                 "--speculative_reopen_ms", "0", "--unanswered_reopen_ms", "0"]
 
     def stop(self):
-        if self.mic:
-            with contextlib.suppress(Exception):
-                self.mic.close()
-            self.mic = None
-        self.level = 0.0
-        if self.ws:
-            with contextlib.suppress(Exception):
-                self.ws.close()
-            self.ws = None
+        # Both of these under the lock, and the socket dropped inside it: terminating the
+        # pipeline below can take 15 s, and for all of that the state is still "running".
+        # check_mic() would see a missing mic and helpfully open a new one, leaving a live
+        # stream feeding a closed socket after the pipeline is gone.
+        with self.mic_lock:
+            if self.mic:
+                with contextlib.suppress(Exception):
+                    self.mic.close()
+                self.mic = None
+            self.level = 0.0
+            if self.ws:
+                with contextlib.suppress(Exception):
+                    self.ws.close()
+                self.ws = None
         if self.proc:
             self.proc.terminate()
             with contextlib.suppress(subprocess.TimeoutExpired):
@@ -351,6 +363,11 @@ class Pipeline:
 
     def open_mic(self):
         import sounddevice as sd
+        with self.mic_lock:
+            self._open_mic()
+
+    def _open_mic(self):
+        import sounddevice as sd
         if self.mic:
             with contextlib.suppress(Exception):
                 self.mic.close()
@@ -363,6 +380,7 @@ class Pipeline:
             want = None
 
         def cb(indata, frames, t, status):
+            self.last_cb = time.monotonic()
             raw = bytes(indata)
             samples = array.array("h", raw)
             self.level = max(abs(min(samples)), abs(max(samples))) / 32768 if samples else 0.0
@@ -373,6 +391,34 @@ class Pipeline:
         self.mic = sd.RawInputStream(samplerate=RATE, channels=1, dtype="int16",
                                      device=want, blocksize=BLOCK * 4, callback=cb)
         self.mic.start()
+        self.last_cb = time.monotonic()      # a fresh stream is not a dead one
+
+    def check_mic(self):
+        """AirPods that wander off mid-sermon, or a USB interface someone unplugs, leave the
+        stream open and mute: PortAudio simply stops calling back. Nothing else notices --
+        the state stays "running", the pipeline sits there translating silence, and the only
+        clue is a level meter that never moves. A failed rescan lands here too, having left
+        self.mic as None. Silence in the room still produces callbacks, so this only fires
+        when the device itself is gone."""
+        with self.mic_lock:
+            # ws is None for the whole of stop(), which is how this tells a device that died
+            # from a pipeline that is being shut down on purpose.
+            if self.state != "running" or self.ws is None:
+                return
+            try:
+                alive = self.mic is not None and self.mic.active and \
+                    time.monotonic() - self.last_cb < MIC_DEAD_S
+            except Exception:
+                alive = False                # a stream that raises when asked is not alive
+            if alive:
+                return
+            self.level = 0.0
+            try:
+                self._open_mic()             # it may be back, or the default will do
+                print("!! the microphone stopped; reopened it", flush=True)
+            except Exception as exc:
+                # state becomes "error", so this cannot loop: the next tick returns above.
+                self._set("error", f"the microphone stopped: {exc}")
 
     def _read_ws(self):
         # The translator and the voice share one GPU lock -- Apple Silicon has one GPU and
@@ -434,15 +480,19 @@ def rescan():
     was the system default back then. Restarting it is the only rescan PortAudio offers.
     It closes every open stream, hence reopening the mic."""
     import sounddevice as sd
-    live = pipeline.mic is not None
-    if live:
-        with contextlib.suppress(Exception):
-            pipeline.mic.close()
-        pipeline.mic = None
-    sd._terminate()
-    sd._initialize()
-    if live:
-        pipeline.open_mic()
+    # Under the lock: for the moment PortAudio is torn down there is no mic, and the
+    # heartbeat's check_mic() would otherwise try to open one against a dead PortAudio and
+    # put the whole pipeline into an error state over a routine device rescan.
+    with pipeline.mic_lock:
+        live = pipeline.mic is not None
+        if live:
+            with contextlib.suppress(Exception):
+                pipeline.mic.close()
+            pipeline.mic = None
+        sd._terminate()
+        sd._initialize()
+        if live:
+            pipeline.open_mic()
 
 
 def devices():
@@ -512,8 +562,14 @@ def heartbeat():
     """Keeps the console's meters moving without the pipeline having to push them."""
     while True:
         time.sleep(.5)
-        if events.count():
-            events.publish(("status", pipeline.status()))
+        try:
+            pipeline.check_mic()      # not gated on a console being open: the mic dying
+            if events.count():        # is worth noticing whether anyone is watching or not
+                events.publish(("status", pipeline.status()))
+        except Exception as exc:
+            # This thread is the mic watchdog as well as the meters. If it dies the console
+            # freezes and a mic that goes away is never noticed again, both in silence.
+            print(f"!! heartbeat: {exc}", flush=True)
 
 
 class Handler(BaseHTTPRequestHandler):
