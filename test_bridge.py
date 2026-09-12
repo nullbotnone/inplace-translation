@@ -210,9 +210,63 @@ bridge.GLOSSARY_PATH.unlink()
 cp = bridge.instructions({**bridge.DEFAULTS, "source": "en", "target": "zh"})
 assert "Speaker:" in cp and "Translate, never reply" in cp, "the cascade prompt changed"
 
-# a chat-template token must never reach the subtitles, where the voice would read it aloud
-assert bridge.sanitize_template_tokens(b'x<|im_start|>assistant\ny') == b"xassistant\ny"
-assert bridge.sanitize_template_tokens(b"plain") == b"plain"
+# The audio model sometimes opens with a chat turn marker. Stripping only the <|...|> part
+# leaves the bare role word behind and the voice reads it out: every sentence began with the
+# word "assistant". The label has to go with the marker.
+for opening in ("<|im_start|>assistant\n神爱世人", "<|im_start|>Assistant: 神爱世人",
+                "Assistant: 神爱世人", "<|im_start|>神爱世人"):
+    r = bridge.LeadingRole()
+    got = r.feed(opening) + r.flush()
+    assert got == "神爱世人", f"{opening!r} -> {got!r}"
+
+# a translation with no marker at all must come through exactly as it is
+r = bridge.LeadingRole()
+assert r.feed("神爱世人，甚至将他的独生子赐给他们。") + r.flush() == "神爱世人，甚至将他的独生子赐给他们。"
+
+# it arrives a token at a time, so the marker is usually split across chunks
+r = bridge.LeadingRole()
+got = "".join(r.feed(bit) for bit in ("<|im_", "start|>assi", "stant\n", "神爱", "世人")) + r.flush()
+assert got == "神爱世人", f"a split marker survived: {got!r}"
+
+# only the opening is cleaned; the word inside a translation is left alone
+r = bridge.LeadingRole()
+got = r.feed("他是一位助理，assistant 这个词") + r.flush()
+assert got == "他是一位助理，assistant 这个词", f"ate real content: {got!r}"
+
+# a short translation is the common case and must not be swallowed: held back while the
+# opening is still ambiguous, it has to come out when the stream ends
+r = bridge.LeadingRole()
+assert r.feed("assistant") == "", "an ambiguous opening should be held"
+assert r.flush() == "assistant", "a short answer was dropped instead of flushed"
+
+# and the flush reaches the wire, in front of the sentinel that ends the response. A whole
+# short sentence can still be in hand at that point, which is what was being lost.
+role = bridge.LeadingRole()
+held = bridge.strip_role(b'data: {"choices":[{"delta":{"content":"<|im_start|>\u795e\u7231"}}]}'
+                         .decode("unicode_escape").encode(), role)
+assert json.loads(held[6:])["choices"][0]["delta"]["content"] == "", "should still be held"
+out = bridge.strip_role(b"data: [DONE]", role)
+assert out.endswith(b"data: [DONE]"), "the sentinel must still close the stream"
+flushed = json.loads(out.split(b"\n")[0][6:])["choices"][0]["delta"]["content"]
+assert flushed == "神爱", f"held text not flushed on [DONE]: {out!r}"
+
+# nothing extra is emitted when all that was held was the marker itself
+role = bridge.LeadingRole()
+bridge.strip_role(b'data: {"choices":[{"delta":{"content":"<|im_start|>"}}]}', role)
+assert bridge.strip_role(b"data: [DONE]", role) == b"data: [DONE]", "emitted an empty delta"
+
+# feed-then-flush on one cleaner: the warm-up call is not streamed, and a short answer would
+# be lost if each half used a fresh cleaner
+one = bridge.LeadingRole()
+assert one.feed("<|im_start|>assistant\n好") + one.flush() == "好"
+
+# the same rewrite on a streamed line, which is where it actually happens
+role = bridge.LeadingRole()
+line = b'data: {"choices":[{"delta":{"content":"<|im_start|>assistant"}}]}'
+assert json.loads(bridge.strip_role(line, role)[6:])["choices"][0]["delta"]["content"] == "", \
+    "a short first chunk must be held back until it can be judged"
+assert bridge.strip_role(b"data: [DONE]", role) == b"data: [DONE]", "the sentinel was rewritten"
+assert bridge.strip_role(b"", role) == b"" 
 
 # omni does not load the cascade's translator, so its download size must not be announced
 msg = bridge.Pipeline()

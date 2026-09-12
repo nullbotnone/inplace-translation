@@ -615,13 +615,75 @@ def session_prompt_of(system_message):
     return found.group(1).strip() if found else system_message
 
 
-TEMPLATE_TOKEN = re.compile(rb"<\|[a-z_]+\|>")
+# A chat turn marker at the start of the answer: "<|im_start|>assistant\n", sometimes
+# "<|im_start|>Assistant: ". Stripping only the <|...|> part leaves the bare word, and the
+# voice then says "assistant" before every sentence -- so the role label goes with it. A role
+# word on its own is only removed when a colon follows it, which no translation starts with.
+ROLE_OPENING = re.compile(r"^\s*(?:<\|[a-z_]+\|>\s*)+(?:assistant|user|system)?\s*[:：]?\s*"
+                          r"|^\s*(?:assistant|user|system)\s*[:：]\s*", re.I)
 
 
-def sanitize_template_tokens(chunk):
-    """Belt and braces. The prompt shape above avoids the leak, but a chat-template token
-    reaching the subtitles would also be read out loud by the voice, so strip any that do."""
-    return TEMPLATE_TOKEN.sub(b"", chunk)
+class LeadingRole:
+    """Removes that opening from a response as it streams.
+
+    The marker only appears at the start and arrives a token at a time, so the first few
+    characters are held back until there is enough to recognise it. Anything that cannot be
+    the start of a marker is released at once -- a translation opening on a Chinese character
+    is the normal case, and holding that back would cost latency for nothing."""
+
+    ENOUGH = 24                            # "<|im_start|>assistant\n" is 22
+
+    def __init__(self):
+        self.held, self.done = "", False
+
+    def feed(self, text):
+        if self.done:
+            return text
+        self.held += text
+        stripped = self.held.lstrip()
+        if stripped and stripped[0] not in "<auAUsS":
+            return self.flush()            # cannot be a marker; let it go immediately
+        if len(self.held) < self.ENOUGH and "\n" not in self.held:
+            return ""                      # still might be
+        return self.flush()
+
+    def flush(self):
+        """Whatever is still held, cleaned. Must be called when the stream ends: a
+        translation shorter than ENOUGH would otherwise never be emitted at all."""
+        if self.done:
+            return ""
+        self.done, held = True, self.held
+        self.held = ""
+        return ROLE_OPENING.sub("", held, count=1)
+
+
+def strip_role(line, role):
+    """One line of the model's SSE stream, with any opening role label taken out of the text.
+
+    Rewriting the JSON rather than the raw bytes keeps this safe when the marker straddles
+    two chunks, which is exactly when a naive replace would miss it."""
+    if not line.startswith(b"data: "):
+        return line
+    payload = line[6:].strip()
+    if payload == b"[DONE]":
+        # End of the response: anything still held goes out ahead of the sentinel, or a
+        # translation too short to have settled the question is dropped in silence.
+        tail = role.flush()
+        if not tail:
+            return line
+        event = {"choices": [{"index": 0, "delta": {"content": tail}, "finish_reason": None}]}
+        return b"data: " + json.dumps(event).encode() + b"\n\n" + line
+    try:
+        event = json.loads(payload)
+    except ValueError:
+        return line
+    changed = False
+    for choice in event.get("choices", []):
+        delta = choice.get("delta") or {}
+        if isinstance(delta.get("content"), str):
+            delta["content"] = role.feed(delta["content"])
+            changed = True
+    return b"data: " + json.dumps(event).encode() if changed else line
 
 
 def broadcast_died(why):
@@ -835,15 +897,46 @@ class Handler(BaseHTTPRequestHandler):
             print(f"!! the audio model is not answering: {exc}", flush=True)
             return self.send_error(502, f"the audio model is not answering: {exc}")
 
+        ctype = r.headers.get("Content-Type", "application/json")
         self.send_response(200)
-        self.send_header("Content-Type", r.headers.get("Content-Type", "application/json"))
+        self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
         self.end_headers()
-        while chunk := r.read(4096):
+        if "event-stream" not in ctype:                    # the warm-up call is not streamed
+            body = r.read()
+            with contextlib.suppress(OSError, ValueError):
+                answer = json.loads(body)
+                for choice in answer.get("choices", []):
+                    msg = choice.get("message") or {}
+                    if isinstance(msg.get("content"), str):
+                        # One cleaner, fed then flushed. Two of them would drop any answer
+                        # short enough to still be held when the first one was thrown away.
+                        cleaner = LeadingRole()
+                        msg["content"] = cleaner.feed(msg["content"]) + cleaner.flush()
+                body = json.dumps(answer).encode()
             with contextlib.suppress(OSError):
-                self.wfile.write(sanitize_template_tokens(chunk))
-                self.wfile.flush()
+                self.wfile.write(body)
+            return
+
+        role, pending = LeadingRole(), b""
+        while True:
+            chunk = r.read(1024)
+            if not chunk:
+                break
+            pending += chunk
+            while b"\n" in pending:
+                line, pending = pending.split(b"\n", 1)
+                with contextlib.suppress(OSError):
+                    self.wfile.write(strip_role(line, role) + b"\n")
+                    self.wfile.flush()
+        with contextlib.suppress(OSError):
+            if pending:
+                self.wfile.write(strip_role(pending, role))
+            tail = role.flush()            # a stream that ended without a [DONE] sentinel
+            if tail:
+                event = {"choices": [{"index": 0, "delta": {"content": tail}}]}
+                self.wfile.write(b"data: " + json.dumps(event).encode() + b"\n\n")
 
     def do_POST(self):
         if not self.local_only():
