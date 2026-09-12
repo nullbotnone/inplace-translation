@@ -696,6 +696,10 @@ class Handler(BaseHTTPRequestHandler):
         body = (HERE / name).read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", ctype)
+        # The console is read fresh from disk on every request, but a browser that cached an
+        # older copy will happily show it for the rest of the day -- so a control added by an
+        # update is simply missing, with nothing to say why.
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

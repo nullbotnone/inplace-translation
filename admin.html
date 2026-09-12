@@ -244,12 +244,12 @@
     <label>
       <span data-zh="引擎" data-tw="引擎" data-en="Engine"></span>
       <select id="engine">
-        <option value="cascade" data-zh="识别 → 翻译 → 语音（稳定）"
-                data-tw="辨識 → 翻譯 → 語音（穩定）"
-                data-en="Recognise → translate → speak (steady)"></option>
-        <option value="omni" data-zh="语音直入模型（实验，需 .venv-omni）"
-                data-tw="語音直入模型（實驗，需 .venv-omni）"
-                data-en="Audio straight into the model (experimental, needs .venv-omni)"></option>
+        <option value="cascade" data-zh="Whisper + 翻译模型 → 语音（稳定，主日用这个）"
+                data-tw="Whisper + 翻譯模型 → 語音（穩定，主日用這個）"
+                data-en="Whisper + a translator → speech (steady; use this on a Sunday)"></option>
+        <option value="omni" data-zh="Qwen3-Omni 30B — 语音直入，省去识别（实验，需 64 GB）"
+                data-tw="Qwen3-Omni 30B — 語音直入，省去辨識（實驗，需 64 GB）"
+                data-en="Qwen3-Omni 30B — audio straight in, no recogniser (experimental, 64 GB)"></option>
       </select>
     </label>
     <label>
