@@ -196,7 +196,12 @@ All of this lives in the console; the notes below are why each one is there.
 - **One direction at a time.** The console translates the sermon into one language. If you
   need English→Chinese and Chinese→English simultaneously, run a second copy of the repo on
   another port with the directions reversed, and hand out two QR codes.
-- **Language model** — 4B is the floor for sermon register. On a 24 GB+ Mac pick the 8B; the
+- **Engine** — *Recognise → translate → speak* is the one to run on a Sunday. *Audio straight
+  into the model* is experimental: one model hears the sermon and writes the Chinese, with no
+  transcription step in between, which is worth about a quarter of a second a sentence and one
+  less model in memory. It needs a 64 GB+ Mac and a one-time setup — see
+  `experiments/README.md` for the three commands and for what had to be worked around.
+- **Language model** — cascade only; the omni engine brings its own. 4B is the floor for sermon register. On a 24 GB+ Mac pick the 8B; the
   difference is visible. On 64 GB+ pick Qwen3.6 35B-A3B, which is the only one that gets Bible
   book names consistently right (see above). Watch for backlog warnings afterwards — a bigger
   model is usually a slower one, though the 35B is a mixture-of-experts and costs far less

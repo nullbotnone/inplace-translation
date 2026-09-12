@@ -7,7 +7,8 @@ an operator console at http://localhost:8000/admin
 
     python3 bridge.py
 """
-import argparse, array, base64, contextlib, json, queue, signal, socket, subprocess, sys, threading, time
+import argparse, array, base64, contextlib, json, queue, re, signal, socket, subprocess, sys, threading, time
+import urllib.error, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -20,6 +21,9 @@ MP3_CHUNK = 256                   # one mp3 frame at this bitrate and rate, in b
                                   # 1024 held four frames back: 303 ms before the first byte
                                   # left the encoder, against 124 ms a frame at a time.
 MAX_QUEUED = 10 * BITRATE // 8 // MP3_CHUNK   # ~10 s buffered per listener before eviction
+OMNI_PORT = 8770                  # the audio-in model's own OpenAI server
+OMNI_MODEL = "mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit"
+OMNI_PYTHON = HERE / ".venv-omni/bin/python"   # mlx-vlm needs its own venv; see README
 MIC_DEAD_S = 3                    # no callback for this long means the input is gone
 LOAD_TIMEOUT_S = 3600             # the port stays shut until the models are downloaded, and
                                   # the 35B option is a 35 GB first run. A pipeline that dies
@@ -37,8 +41,9 @@ DEFAULTS = {
     "chat_size": 2,
     "min_silence_ms": 64,
     "lead_ms": 1500,                                             # voice buffered before it plays
+    "engine": "cascade",                                         # cascade | omni
 }
-NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source"}
+NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source", "engine"}
 # device, target, lead_ms and the glossary apply live: the first reopens the mic, the next two
 # only change the prompt and a buffer. "source" sets the recognition language, a CLI flag.
 
@@ -50,7 +55,8 @@ LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
 
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.
-CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"}}
+CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"},
+           "engine": {"cascade", "omni"}}
 BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000), "lead_ms": (200, 8000)}
 
 
@@ -143,12 +149,35 @@ def load_config():
     return cfg
 
 
-def instructions(cfg):
-    """Rebuilt on every session.update, so glossary and target edits apply without a restart."""
+def omni_prompt(cfg):
+    """The audio-in model will not take the cascade's prompt.
+
+    Measured on Qwen3-Omni-30B-A3B: prose rules ("Translate, never reply. Sentence for
+    sentence...") make it transcribe the English instead of translating it, every time, even
+    when the same text says "no transcription". The Speaker:/You: example makes it answer with
+    a chat turn marker, <|im_start|>assistant, which the voice would then read out. What does
+    work is the book list, the glossary, and one imperative last -- and with the book list it
+    reaches for 神爱世人 over 上帝爱世人 on its own. A question comes back translated, not
+    answered, which is the job the example was doing in the cascade."""
+    target = TARGETS[cfg["target"]]
+    return (f"Bible book names:\n{BIBLE_BOOKS}\n\n{house_style()}"
+            f"Translate into {target}. Output only the {target} translation.")
+
+
+def house_style():
+    """The glossary, minus the operator's own notes. Shared by both prompts."""
     raw = GLOSSARY_PATH.read_text() if GLOSSARY_PATH.exists() else ""
     # '#' lines are notes to whoever maintains the file. They must not reach the model, which
     # would otherwise read "copy this to glossary.txt" as part of its instructions.
     glossary = "\n".join(l for l in raw.splitlines() if not l.lstrip().startswith("#")).strip()
+    return glossary + "\n\n" if glossary else ""
+
+
+def instructions(cfg):
+    """Rebuilt on every session.update, so glossary and target edits apply without a restart."""
+    if cfg.get("engine") == "omni":
+        return omni_prompt(cfg)
+    glossary = house_style().strip()
     return base_prompt(cfg) + ("\n" + glossary if glossary else "")
 
 
@@ -243,7 +272,7 @@ class Pipeline:
         self.cfg = load_config()
         self.state = "stopped"      # stopped | starting | running | error
         self.detail = ""
-        self.proc = self.ws = self.mic = None
+        self.proc = self.ws = self.mic = self.omni = None
         self.level = 0.0            # most recent mic peak, 0..1
         self.last_cb = 0.0          # when the mic last handed us a block
         self.lock = threading.Lock()
@@ -274,6 +303,8 @@ class Pipeline:
 
     def _run(self):
         try:
+            if self.cfg["engine"] == "omni":
+                self._start_omni()
             if not port_open(S2S_PORT):
                 self.proc = subprocess.Popen(self._command(), cwd=HERE)
                 size = "35 GB" if "35B" in self.cfg["model"] else "6.6 GB"
@@ -299,8 +330,52 @@ class Pipeline:
             self._set("error", str(exc))
             self.stop()
 
+    def _start_omni(self):
+        """The audio-in model runs in its own venv: mlx-vlm pulls a newer mlx than the
+        pipeline is pinned to, and that pin is deliberate (utils/mlx_lock.py)."""
+        if port_open(OMNI_PORT):
+            self._set("starting", "attaching to an audio model already on :%d" % OMNI_PORT)
+            return
+        if not OMNI_PYTHON.exists():
+            raise RuntimeError(f"{OMNI_PYTHON} is missing -- see the README for the one-time "
+                               f"setup of the audio model's venv")
+        self._set("starting", "loading the audio model (36 GB)")
+        self.omni = subprocess.Popen([str(OMNI_PYTHON), "-m", "mlx_vlm.server",
+                                      "--model", OMNI_MODEL, "--port", str(OMNI_PORT)],
+                                     cwd=HERE, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL)
+        deadline = time.monotonic() + LOAD_TIMEOUT_S
+        while not port_open(OMNI_PORT):
+            if self.omni.poll() is not None:
+                raise RuntimeError(f"the audio model exited with code {self.omni.returncode}")
+            if time.monotonic() > deadline:
+                raise RuntimeError("the audio model did not answer on :%d in time" % OMNI_PORT)
+            time.sleep(1)
+
     def _command(self):
         c = self.cfg
+        if c["engine"] == "omni":
+            # No STT stage at all: the VAD's audio goes straight to the model, through the
+            # proxy above, which is this same HTTP server.
+            return ["speech-to-speech", "serve", "--mac-optimal-settings",
+                    "--stt", "none", "--llm_backend", "chat-completions",
+                    "--model_name", OMNI_MODEL,
+                    "--responses_api_base_url", f"http://127.0.0.1:{HTTP_PORT}/omni/v1",
+                    "--tts", c["tts"],
+                    # No history. Given previous turns the model starts answering the chat
+                    # rather than translating it: it prefixes replies with "Assistant:" and,
+                    # by the fourth turn, began translating the book list out loud instead of
+                    # the sermon. One utterance at a time is what it is good at, and the
+                    # prompt asks for sentence-for-sentence anyway. Hence chat_size stays a
+                    # cascade-only setting.
+                    "--chat_size", "0",
+                    "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1",
+                    "--stream_batch_sentences", "1", "--no_compact_history",
+                    # Only this turn's audio. The default keeps recent turns' audio in the
+                    # history, re-sending and re-encoding it on every turn.
+                    "--responses_api_audio_history_turns", "0",
+                    "--no_smart_turn",
+                    "--speculative_reopen_ms", "0", "--unanswered_reopen_ms", "0"]
         return ["speech-to-speech", "serve", "--mac-optimal-settings",
                 "--stt", c["stt"], "--language", c["source"], "--tts", c["tts"],
                 "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
@@ -340,13 +415,15 @@ class Pipeline:
                 with contextlib.suppress(Exception):
                     self.ws.close()
                 self.ws = None
-        if self.proc:
-            self.proc.terminate()
-            with contextlib.suppress(subprocess.TimeoutExpired):
-                self.proc.wait(15)
-            if self.proc.poll() is None:
-                self.proc.kill()
-            self.proc = None
+        for name in ("proc", "omni"):          # the pipeline, then the audio model behind it
+            child = getattr(self, name)
+            if child:
+                child.terminate()
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    child.wait(15)
+                if child.poll() is None:
+                    child.kill()
+                setattr(self, name, None)
         if self.state != "error":
             self._set("stopped", "")
 
@@ -505,6 +582,30 @@ def devices():
                             if d["max_input_channels"] > 0], "error": ""}
     except Exception as exc:
         return {"devices": [], "error": f"Cannot read audio devices: {exc}"}
+
+
+# The pipeline wraps our instructions in a voice-assistant envelope: a lead about being in a
+# spoken conversation, then "Session Prompt:", then a "## Voice Rules" tail telling it to keep
+# replies brief and treat transcripts as noisy. All of that is prose about being an assistant,
+# and prose is what makes the audio-in model transcribe the English instead of translating it.
+# Keep the session prompt, drop the envelope. If upstream renames these markers we fall back
+# to passing the whole thing through, which is what we did before.
+SESSION_PROMPT = re.compile(r"Session Prompt:\n(.*?)(?:\n#+ Voice Rules|\Z)", re.S)
+
+
+def session_prompt_of(system_message):
+    """Our instructions, unwrapped from whatever the pipeline put around them."""
+    found = SESSION_PROMPT.search(system_message)
+    return found.group(1).strip() if found else system_message
+
+
+TEMPLATE_TOKEN = re.compile(rb"<\|[a-z_]+\|>")
+
+
+def sanitize_template_tokens(chunk):
+    """Belt and braces. The prompt shape above avoids the leak, but a chat-template token
+    reaching the subtitles would also be read out loud by the voice, so strip any that do."""
+    return TEMPLATE_TOKEN.sub(b"", chunk)
 
 
 def broadcast_died(why):
@@ -672,11 +773,66 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_file("index.html", "text/html; charset=utf-8")
 
+    def omni_proxy(self, body):
+        """Sit between the pipeline and the audio-in model's server.
+
+        The pipeline delivers its instructions as a system message, and mlx-vlm's server
+        mangles those for this model: the reply comes back as chat-template tokens and a
+        truncated answer ('<|im_start|>user\\nJohn three'). The same text works when it rides
+        in the user turn, after the audio -- before the audio and it transcribes instead of
+        translating. So move it, forward, and stream the answer back."""
+        try:
+            req = json.loads(body)
+        except ValueError as exc:
+            return self.send_error(400, f"bad proxy body: {exc}")
+
+        messages, carried = [], []
+        for m in req.get("messages", []):
+            if m.get("role") == "system":
+                carried.append(session_prompt_of(m.get("content") or ""))
+            else:
+                messages.append(m)
+        if carried and messages:
+            last = dict(messages[-1])
+            content = last.get("content")
+            if not isinstance(content, list):
+                content = [{"type": "text", "text": str(content or "")}]
+            # after the audio: the order is what decides translate vs transcribe
+            last["content"] = list(content) + [{"type": "text", "text": "\n".join(carried)}]
+            messages[-1] = last
+        req["messages"] = messages
+
+        upstream = urllib.request.Request(
+            f"http://127.0.0.1:{OMNI_PORT}/v1/chat/completions",
+            data=json.dumps(req).encode(), headers={"Content-Type": "application/json"})
+        try:
+            r = urllib.request.urlopen(upstream, timeout=600)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:300]
+            print(f"!! the audio model rejected the request: {exc.code} {detail}", flush=True)
+            return self.send_error(502, f"the audio model rejected the request: {exc.code}")
+        except urllib.error.URLError as exc:
+            print(f"!! the audio model is not answering: {exc}", flush=True)
+            return self.send_error(502, f"the audio model is not answering: {exc}")
+
+        self.send_response(200)
+        self.send_header("Content-Type", r.headers.get("Content-Type", "application/json"))
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        while chunk := r.read(4096):
+            with contextlib.suppress(OSError):
+                self.wfile.write(sanitize_template_tokens(chunk))
+                self.wfile.flush()
+
     def do_POST(self):
         if not self.local_only():
             return
         length = int(self.headers.get("Content-Length") or 0)
-        if length > 1 << 20:
+        # A turn of audio arrives here base64'd -- 20 s of it is about 850 KB -- so the proxy
+        # needs far more headroom than a console form post.
+        cap = 64 << 20 if self.path.startswith("/omni/") else 1 << 20
+        if length > cap:
             return self.send_error(413, "too large")
         try:
             body = self.rfile.read(length)
@@ -684,6 +840,8 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, OSError) as exc:
             return self.send_error(400, f"bad request body: {exc}")
         path = self.path.split("?")[0]
+        if path == "/omni/v1/chat/completions":
+            return self.omni_proxy(body)
         if path == "/api/start":
             pipeline.start()
         elif path == "/api/stop":

@@ -42,6 +42,8 @@ def ask(wav: bytes, text: str, *, system: str | None = None, max_tokens: int = 2
 
 
 def main():
+    if len(sys.argv) < 2:
+        return __doc__.strip().splitlines()[0] + "\n\n    omni_probe.py path/to/speech.wav"
     wav = Path(sys.argv[1]).read_bytes()
     prompt = bridge.instructions({**bridge.DEFAULTS, "source": "en", "target": "zh"})
     short = "Translate into Chinese. Output only the Chinese translation."

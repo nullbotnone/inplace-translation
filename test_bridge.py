@@ -179,11 +179,55 @@ assert "--no_smart_turn" in cmd, "smart turn holds the turn open for a pausing s
 assert cmd[cmd.index("--speculative_reopen_ms") + 1] == "0", "the turn still reopens"
 assert cmd[cmd.index("--unanswered_reopen_ms") + 1] == "0", "the turn still reopens"
 
+# the omni engine drops the STT stage entirely and routes the model through our own proxy
+omni = bridge.Pipeline()
+omni.cfg = {**bridge.DEFAULTS, "engine": "omni"}
+ocmd = omni._command()
+assert ocmd[ocmd.index("--stt") + 1] == "none", "omni still runs a speech-to-text stage"
+assert ocmd[ocmd.index("--llm_backend") + 1] == "chat-completions"
+assert ocmd[ocmd.index("--responses_api_base_url") + 1] == \
+    f"http://127.0.0.1:{bridge.HTTP_PORT}/omni/v1", "omni must go through our proxy"
+assert "--language" not in ocmd, "there is no recogniser to give a language to"
+
+# the audio model will not take the cascade's prompt: prose rules make it transcribe instead
+# of translate, and the Speaker:/You: example makes it emit a chat turn marker out loud
+op = bridge.instructions({**bridge.DEFAULTS, "engine": "omni", "target": "zh"})
+assert "Speaker:" not in op and "You:" not in op, "the example leaks <|im_start|> into the voice"
+assert "Translate, never reply" not in op, "prose rules make this model transcribe"
+assert op.rstrip().endswith("Output only the Chinese translation."), "the imperative must come last"
+assert "John = 约翰福音" in op, "the book list is what keeps the names right"
+# and the glossary still reaches it, because that is how a church sets its house style
+bridge.GLOSSARY_PATH.write_text("Grace Chapel -> 恩典堂")
+assert "恩典堂" in bridge.instructions({**bridge.DEFAULTS, "engine": "omni", "target": "zh"})
+bridge.GLOSSARY_PATH.unlink()
+# the cascade keeps its own prompt, example and all
+cp = bridge.instructions({**bridge.DEFAULTS, "source": "en", "target": "zh"})
+assert "Speaker:" in cp and "Translate, never reply" in cp, "the cascade prompt changed"
+
+# a chat-template token must never reach the subtitles, where the voice would read it aloud
+assert bridge.sanitize_template_tokens(b'x<|im_start|>assistant\ny') == b"xassistant\ny"
+assert bridge.sanitize_template_tokens(b"plain") == b"plain"
+
+# no history in omni mode. Given previous turns the model answers the chat instead of
+# translating it -- "Assistant:" prefixes, and by the fourth turn it read the book list aloud
+assert ocmd[ocmd.index("--chat_size") + 1] == "0", "omni must not carry conversation history"
+assert ocmd[ocmd.index("--responses_api_audio_history_turns") + 1] == "0", "old audio re-sent"
+
+# the pipeline wraps our instructions in a voice-assistant envelope. That prose is exactly
+# what makes the audio model transcribe instead of translate, so the proxy unwraps it.
+wrapped = ("You are in a spoken conversation. The user speaks and hears you.\n"
+           "The session prompt defines persona, facts, goals.\n\n"
+           "Session Prompt:\nTranslate into Chinese.\n\n"
+           "## Voice Rules\n- Keep replies brief by default.\n")
+assert bridge.session_prompt_of(wrapped) == "Translate into Chinese.", "the envelope survived"
+# an envelope we do not recognise is passed through rather than thrown away
+assert bridge.session_prompt_of("just a prompt") == "just a prompt"
+
 # junk never reaches a CLI flag or a dict lookup
 p1 = bridge.Pipeline()
 for bad in ({"source": "klingon"}, {"target": "zh-Hanzi"}, {"tts": "; rm -rf /"},
             {"target": "zh-Hans"}, {"chat_size": 99}, {"chat_size": "two"}, {"chat_size": True},
-            {"min_silence_ms": -1}, {"lead_ms": 0}, {"lead_ms": 99999}, {"device": -1}, {"device": ""}, {"device": 1}, {"model": ""}):
+            {"min_silence_ms": -1}, {"lead_ms": 0}, {"engine": "magic"}, {"lead_ms": 99999}, {"device": -1}, {"device": ""}, {"device": 1}, {"model": ""}):
     assert p1.update(bad) is False and p1.cfg == bridge.DEFAULTS, f"accepted {bad}"
 # the mic is stored by name, because indices shuffle whenever a Bluetooth device comes or goes
 assert p1.update({"device": "AirPods Pro"}) is False, "picking a mic should not need a restart"

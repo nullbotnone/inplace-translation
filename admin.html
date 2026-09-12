@@ -242,6 +242,17 @@
       </select>
     </label>
     <label>
+      <span data-zh="引擎" data-tw="引擎" data-en="Engine"></span>
+      <select id="engine">
+        <option value="cascade" data-zh="识别 → 翻译 → 语音（稳定）"
+                data-tw="辨識 → 翻譯 → 語音（穩定）"
+                data-en="Recognise → translate → speak (steady)"></option>
+        <option value="omni" data-zh="语音直入模型（实验，需 .venv-omni）"
+                data-tw="語音直入模型（實驗，需 .venv-omni）"
+                data-en="Audio straight into the model (experimental, needs .venv-omni)"></option>
+      </select>
+    </label>
+    <label>
       <span data-zh="语音" data-tw="語音" data-en="Voice"></span>
       <select id="tts">
         <option value="qwen3" data-zh="Qwen3-TTS — 最好听" data-tw="Qwen3-TTS — 最好聽"
@@ -322,7 +333,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const CFG = ["source", "target", "device", "model", "tts", "chat_size", "min_silence_ms",
-             "lead_ms"];
+             "lead_ms", "engine"];
 const LANGS = ["zh", "tw", "en"];
 const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 

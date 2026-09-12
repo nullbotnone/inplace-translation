@@ -7,3 +7,6 @@ __pycache__/
 # (Comments need their own line - gitignore has no trailing-comment syntax.)
 glossary.txt
 config.json
+
+# The audio-in model needs its own venv: mlx-vlm pulls a newer mlx than the pipeline pins.
+.venv-omni
