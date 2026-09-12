@@ -193,9 +193,11 @@ All of this lives in the console; the notes below are why each one is there.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
 - **Voice** — Qwen3-TTS sounds best. If `!! backlog, dropping audio` keeps appearing and a
-  smaller model has not fixed it, switch to Kokoro. The bridge holds each turn's audio until
-  the voice has finished it, so the model and the voice taking turns on the GPU is heard as
-  a slightly later sentence rather than a stuttering one.
+  smaller model has not fixed it, switch to Kokoro.
+- **Voice buffer** — the model and the voice take turns on the one GPU, so the voice arrives
+  in gusts. The bridge buffers this much of it before playing, which is heard as delay rather
+  than as stuttering. Raise it if the audio chops, lower it if the voice lags too far behind
+  the preacher. 1.5 s is a starting point, not a right answer; tune it by ear in your room.
 
 ## What this is not
 

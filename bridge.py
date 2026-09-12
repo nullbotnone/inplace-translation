@@ -15,7 +15,6 @@ HERE = Path(__file__).resolve().parent
 S2S_PORT, HTTP_PORT = 8765, 8000
 RATE, BLOCK = 16000, 320          # 20 ms of s16le mono
 MAX_LAG_S = 20                    # translation backlog before we start dropping
-MAX_HOLD_S = 8                    # longest single turn held whole before it has to go out
 MAX_QUEUED = 60                   # mp3 chunks buffered per listener (~10 s) before eviction
 LOAD_TIMEOUT_S = 900              # first run downloads ~6.6 GB before the port answers
 
@@ -30,10 +29,11 @@ DEFAULTS = {
     "tts": "qwen3",
     "chat_size": 2,
     "min_silence_ms": 64,
+    "lead_ms": 1500,                                             # voice buffered before it plays
 }
 NEEDS_RESTART = {"model", "stt", "tts", "chat_size", "min_silence_ms", "source"}
-# device, target and the glossary apply live: the first reopens the mic, the other two only
-# change the prompt. "source" sets the recognition language, which is a CLI flag.
+# device, target, lead_ms and the glossary apply live: the first reopens the mic, the next two
+# only change the prompt and a buffer. "source" sets the recognition language, a CLI flag.
 
 SPOKEN = {"en": "English", "zh": "Chinese", "auto": "whatever language the speaker uses"}
 TARGETS = {"en": "English", "zh": "Chinese"}
@@ -44,7 +44,7 @@ LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.
 CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"}}
-BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000)}
+BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000), "lead_ms": (200, 8000)}
 
 
 def valid(key, value):
@@ -290,7 +290,15 @@ class Pipeline:
         return ["speech-to-speech", "serve", "--mac-optimal-settings",
                 "--stt", c["stt"], "--language", c["source"], "--tts", c["tts"],
                 "--model_name", c["model"], "--chat_size", str(c["chat_size"]),
-                "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1"]
+                "--min_silence_ms", str(c["min_silence_ms"]), "--num_pipelines", "1",
+                # The voice cannot start until the translator hands it a batch, and a batch
+                # is three finished sentences by default. One sentence is what a simultaneous
+                # interpreter does anyway, and it is the largest single win in voice delay.
+                "--stream_batch_sentences", "1",
+                # Otherwise every turn past chat_size fires a background LLM call to summarise
+                # the history -- on the same GPU lock the voice is waiting for, to produce a
+                # summary this prompt tells the model to ignore. Evict the old turn instead.
+                "--no_compact_history"]
 
     def stop(self):
         if self.mic:
@@ -349,10 +357,12 @@ class Pipeline:
         self.mic.start()
 
     def _read_ws(self):
-        # The translator and the voice share one GPU lock, so a turn's audio arrives in
-        # gusts: the TTS stalls every time the language model takes the lock to write the
-        # next sentence. Played as it lands, that silence lands inside words. Hold the turn
-        # until the TTS says it is finished, then hand it over as one piece.
+        # The translator and the voice share one GPU lock -- Apple Silicon has one GPU and
+        # mlx serialises it -- so a turn's audio arrives in gusts: the TTS stalls every time
+        # the language model takes the lock to write the next sentence. Played as it lands,
+        # that silence lands inside words. So hold a lead of lead_ms and let the pacer play
+        # out of that while the next gust is generated. Holding the whole turn instead is
+        # gapless, but costs a whole turn of delay before the first word is heard.
         held = bytearray()
         try:
             for msg in self.ws:
@@ -361,8 +371,10 @@ class Pipeline:
                 # GA calls it response.output_audio.delta; older builds response.audio.delta
                 if t.endswith("audio.delta") and "transcript" not in t:
                     held += base64.b64decode(ev["delta"])
-                    if len(held) > MAX_HOLD_S * RATE * 2:
-                        out_q.put(bytes(held))      # a turn this long is not going to end soon
+                    # Read per gust, so an operator who hears chopping can raise the lead
+                    # mid-sermon and hear the difference on the next sentence.
+                    if len(held) >= self.cfg["lead_ms"] * RATE * 2 // 1000:
+                        out_q.put(bytes(held))
                         held.clear()
                 elif t.endswith("audio.done") and "transcript" not in t:
                     if held:
@@ -446,7 +458,7 @@ def pacer(stdin, stop=None):
             buf, pos = buf[pos:] + out_q.get_nowait(), 0
         # ponytail: drop oldest on backlog. A faster speaker than the TTS drifts forever
         # otherwise. Upgrade path if this fires often: shrink chat_size, faster TTS.
-        # In bytes, not items: a queued item is a whole turn, a word or MAX_HOLD_S of speech.
+        # In bytes, not items: a queued item is lead_ms of speech, or the tail of a turn.
         with out_q.mutex:
             queued = sum(len(chunk) for chunk in out_q.queue)
         if queued + len(buf) - pos > MAX_LAG_S * RATE * 2:

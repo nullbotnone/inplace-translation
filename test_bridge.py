@@ -39,11 +39,20 @@ p_ws._read_ws()
 assert bridge.out_q.get_nowait() == b"\1\2\3\4", "a turn should arrive whole, not gust by gust"
 assert bridge.out_q.empty(), "audio for an unfinished turn should still be held"
 
-# ... unless the turn runs on: audio can be held back, but not indefinitely
-p_ws.ws = [json.dumps({"type": "response.output_audio.delta",
-                       "delta": b64(b"\0" * (bridge.MAX_HOLD_S * bridge.RATE * 2 + 2))})]
+# ... but only up to the lead: a long turn starts playing while the rest is still being
+# spoken, instead of the listener waiting out the whole turn first
+lead = bridge.DEFAULTS["lead_ms"] * bridge.RATE * 2 // 1000
+p_ws.ws = [json.dumps({"type": "response.output_audio.delta", "delta": b64(b"\0" * lead)})]
 p_ws._read_ws()
-assert not bridge.out_q.empty(), "a turn that never ends was never released"
+assert bridge.out_q.get_nowait() == b"\0" * lead, "a full lead was not released without done"
+assert bridge.out_q.empty()
+
+# the lead is read per gust, so raising it mid-sermon applies to the next sentence
+p_ws.cfg = {**bridge.DEFAULTS, "lead_ms": bridge.BOUNDS["lead_ms"][1]}
+p_ws.ws = [json.dumps({"type": "response.output_audio.delta", "delta": b64(b"\0" * lead)})]
+p_ws._read_ws()
+assert bridge.out_q.empty(), "the old lead was still in force"
+p_ws.cfg = dict(bridge.DEFAULTS)
 with bridge.out_q.mutex:
     bridge.out_q.queue.clear()
 
@@ -152,11 +161,18 @@ assert p0._command()[p0._command().index("--language") + 1] == "zh"
 p0.cfg = {**zh2en, "source": "auto"}
 assert p0._command()[p0._command().index("--language") + 1] == "auto"
 
+# the voice waits on the translator for its text and on the same GPU lock to speak it, so
+# neither may be made to wait longer than it has to: one sentence per batch, and no
+# background summary generation competing for the lock mid-sermon
+cmd = p0._command()
+assert cmd[cmd.index("--stream_batch_sentences") + 1] == "1", "the voice waits on 3 sentences"
+assert "--no_compact_history" in cmd, "a background LLM call still contends for the GPU"
+
 # junk never reaches a CLI flag or a dict lookup
 p1 = bridge.Pipeline()
 for bad in ({"source": "klingon"}, {"target": "zh-Hanzi"}, {"tts": "; rm -rf /"},
             {"target": "zh-Hans"}, {"chat_size": 99}, {"chat_size": "two"}, {"chat_size": True},
-            {"min_silence_ms": -1}, {"device": -1}, {"device": ""}, {"device": 1}, {"model": ""}):
+            {"min_silence_ms": -1}, {"lead_ms": 0}, {"lead_ms": 99999}, {"device": -1}, {"device": ""}, {"device": 1}, {"model": ""}):
     assert p1.update(bad) is False and p1.cfg == bridge.DEFAULTS, f"accepted {bad}"
 # the mic is stored by name, because indices shuffle whenever a Bluetooth device comes or goes
 assert p1.update({"device": "AirPods Pro"}) is False, "picking a mic should not need a restart"

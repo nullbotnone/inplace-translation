@@ -216,7 +216,16 @@
               data-en="Pause before translating (ms)"></span>
         <input type="number" id="min_silence_ms" min="32" max="1000" step="32">
       </label>
+      <label>
+        <span data-zh="语音缓冲（毫秒）" data-tw="語音緩衝（毫秒）"
+              data-en="Voice buffer (ms)"></span>
+        <input type="number" id="lead_ms" min="200" max="8000" step="100">
+      </label>
     </div>
+    <p class="hint"
+       data-zh="语音断断续续就把缓冲调大，嫌慢就调小。立刻生效，不用重启。"
+       data-tw="語音斷斷續續就把緩衝調大，嫌慢就調小。立刻生效，不用重啟。"
+       data-en="Raise the voice buffer if the audio chops, lower it if the voice lags behind. Applies at once — no restart."></p>
     <p class="hint" id="restarthint"></p>
   </div>
 
@@ -256,7 +265,8 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const CFG = ["source", "target", "device", "model", "tts", "chat_size", "min_silence_ms"];
+const CFG = ["source", "target", "device", "model", "tts", "chat_size", "min_silence_ms",
+             "lead_ms"];
 const LANGS = ["zh", "tw", "en"];
 const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 
