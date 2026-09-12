@@ -177,6 +177,15 @@ Four things to get right on a Mac that nobody logs into on Sunday morning:
 
 All of this lives in the console; the notes below are why each one is there.
 
+- **Model** — the smaller models get Bible book names wrong in a specific way: they calque
+  the English ordinal, so "Second John" becomes 第二封约翰书 instead of 约翰二书, and 4B
+  renders a bare "John" as 约翰书 rather than 约翰福音. Scored on 72 book references,
+  greedy: Qwen3 4B 20/28 on the short set, Qwen3 8B 58/72, Qwen3.6 35B-A3B 68/72 — and all
+  four of the 35B's misses are it correctly naming the prophet rather than the book. No
+  prompt wording fixed the 8B; the variants that helped the numbered books broke plain
+  "John". If book names matter to your congregation and the Mac has the memory, this is the
+  setting that fixes them. The 35B is a mixture-of-experts with ~3B active, so it costs
+  0.5 s a sentence rather than 0.3 s, not 4x.
 - **`glossary.txt`** — your ministry names and your elders' names. The single biggest quality
   win available to you. The 66 Chinese book names (和合本) are already built into the prompt,
   so only name a translation here if your church quotes a different one.
