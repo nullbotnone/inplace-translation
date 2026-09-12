@@ -315,8 +315,7 @@ class Pipeline:
                 self._start_omni()
             if not port_open(S2S_PORT):
                 self.proc = subprocess.Popen(self._command(), cwd=HERE)
-                size = "35 GB" if "35B" in self.cfg["model"] else "6.6 GB"
-                self._set("starting", f"loading models (first run downloads ~{size})")
+                self._set("starting", self._loading_message())
                 deadline = time.monotonic() + LOAD_TIMEOUT_S
                 while not port_open(S2S_PORT):
                     if self.proc.poll() is not None:
@@ -337,6 +336,15 @@ class Pipeline:
         except Exception as exc:
             self._set("error", str(exc))
             self.stop()
+
+    def _loading_message(self):
+        """What the console says while the pipeline's models load."""
+        if self.cfg["engine"] == "omni":
+            # The translator model is not loaded in this mode -- the audio model is doing
+            # that job -- so naming its download size here would just be wrong.
+            return "loading the voice"
+        size = "35 GB" if "35B" in self.cfg["model"] else "6.6 GB"
+        return f"loading models (first run downloads ~{size})"
 
     def _start_omni(self):
         """The audio-in model runs in its own venv: mlx-vlm pulls a newer mlx than the

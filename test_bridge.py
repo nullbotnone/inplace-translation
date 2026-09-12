@@ -214,6 +214,15 @@ assert "Speaker:" in cp and "Translate, never reply" in cp, "the cascade prompt 
 assert bridge.sanitize_template_tokens(b'x<|im_start|>assistant\ny') == b"xassistant\ny"
 assert bridge.sanitize_template_tokens(b"plain") == b"plain"
 
+# omni does not load the cascade's translator, so its download size must not be announced
+msg = bridge.Pipeline()
+msg.cfg = {**bridge.DEFAULTS, "engine": "omni", "model": "mlx-community/Qwen3.6-35B-A3B-8bit"}
+assert "35 GB" not in msg._loading_message(), "omni announced the translator's download"
+msg.cfg = {**msg.cfg, "engine": "cascade"}
+assert "35 GB" in msg._loading_message(), "the cascade still has to warn about the download"
+msg.cfg = {**msg.cfg, "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit"}
+assert "6.6 GB" in msg._loading_message()
+
 # no history in omni mode. Given previous turns the model answers the chat instead of
 # translating it -- "Assistant:" prefixes, and by the fourth turn it read the book list aloud
 assert ocmd[ocmd.index("--chat_size") + 1] == "0", "omni must not carry conversation history"
