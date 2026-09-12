@@ -300,20 +300,20 @@
       </select>
     </label>
     <div class="row">
-    <label>
-      <span data-zh="语音引擎" data-tw="語音引擎" data-en="Voice engine"></span>
-      <select id="tts">
-        <option value="kokoro" data-zh="Kokoro — 速度较快，可选声音" data-tw="Kokoro — 速度較快，可選聲音"
-                data-en="Kokoro — faster; choice of voices"></option>
-        <option value="qwen3" data-zh="Qwen3-TTS — 音质最佳，速度较慢"
-                data-tw="Qwen3-TTS — 音質最佳，速度較慢"
-                data-en="Qwen3-TTS — highest quality; slower"></option>
-      </select>
-    </label>
-    <label data-kokoro-only class="narrow">
-      <span data-zh="声音" data-tw="聲音" data-en="Voice"></span>
-      <select id="voice"></select>
-    </label>
+      <label>
+        <span data-zh="语音引擎" data-tw="語音引擎" data-en="Voice engine"></span>
+        <select id="tts">
+          <option value="kokoro" data-zh="Kokoro — 速度较快，可选声音" data-tw="Kokoro — 速度較快，可選聲音"
+                  data-en="Kokoro — faster; choice of voices"></option>
+          <option value="qwen3" data-zh="Qwen3-TTS — 音质最佳，速度较慢"
+                  data-tw="Qwen3-TTS — 音質最佳，速度較慢"
+                  data-en="Qwen3-TTS — highest quality; slower"></option>
+        </select>
+      </label>
+      <label data-kokoro-only class="narrow">
+        <span data-zh="声音" data-tw="聲音" data-en="Voice"></span>
+        <select id="voice"></select>
+      </label>
     </div>
     <p class="hint" id="voicehint"></p>
     <div class="row">
@@ -546,13 +546,15 @@ function paint() {
   $("enginehint").textContent = omni ? t("omniignores") : "";
 
   // A Kokoro voice only speaks its own language, so the list follows what listeners hear.
-  // Rebuilt only when that (or the console language) changes: a <select> rebuilt under the
-  // operator's cursor closes itself mid-choice.
-  const kokoro = s.config.tts === "kokoro";
+  // A language bridge.py grew but this list did not is a missing dropdown, not a blank page.
+  const speakable = VOICES[s.config.target] ?? [];
+  const kokoro = s.config.tts === "kokoro" && speakable.length > 0;
+  // Rebuilt only when that language (or the console's) changes: a <select> rebuilt under
+  // the operator's cursor closes itself mid-choice.
   const voiceKey = s.config.target + lang;
   if ($("voice").dataset.built !== voiceKey) {
     $("voice").dataset.built = voiceKey;
-    $("voice").innerHTML = VOICES[s.config.target].map((v) => {
+    $("voice").innerHTML = speakable.map((v) => {
       const name = v.slice(3).replace(/^./, (c) => c.toUpperCase());
       return `<option value="${v}">${name} · ${t(v[1] === "f" ? "female" : "male")}</option>`;
     }).join("");

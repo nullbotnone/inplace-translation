@@ -74,6 +74,9 @@ TARGETS = {"en": "English", "zh": "Chinese"}
 # Listeners hear audio, where 简体 vs 繁體 does not exist. It only shows up in the
 # subtitles, so a church that wants Traditional asks for it in the glossary instead.
 LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
+# Every language listeners can be sent to needs voices that speak it. Fail here, at the two
+# lists, rather than with a KeyError at startup or an empty dropdown in the console.
+assert set(VOICES) == set(TARGETS), "VOICES and TARGETS disagree about the languages we speak"
 
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.

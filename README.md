@@ -9,9 +9,9 @@ no app, just a browser tab. Nothing leaves the building.
 mic ─▶ bridge.py ──┼─▶ /subs (subtitles) ─────┴─▶ phones on the church wifi
        │           └─▶ /admin ──────────────────▶ you, on this Mac only
        │
-       └─ spawns: speech-to-speech serve
-                    cascade:  VAD → Whisper → translator → Qwen3-TTS
-                    omni:     VAD → Qwen3-Omni ─────────→ Qwen3-TTS
+       └─ spawns: run_pipeline.py (speech-to-speech serve)
+                    cascade:  VAD → Whisper → translator → Kokoro
+                    omni:     VAD → Qwen3-Omni ─────────→ Kokoro
 ```
 
 `bridge.py` starts the pipeline, so there is one thing to run and one page to drive it.
@@ -281,15 +281,15 @@ All of this lives in the console; the notes below are why each one is there.
 
 ## Where the models live
 
-The first run downloads about 6.6 GB into your home directory, not into the project folder,
+The first run downloads about 4.3 GB into your home directory, not into the project folder,
 so deleting the repo reclaims none of it. Switching the translator in the console downloads
-that model too, the first time you select it: the 8B is 4.3 GB, the 35B is 35 GB and the omni
-engine's model is 36 GB, and none of them replaces what is already there. The omni model lands
+that model too, the first time you select it: the 8B is 4.6 GB, the 35B is 37.7 GB and the omni
+engine's model is 38.8 GB, and none of them replaces what is already there. The omni model lands
 in the same cache even though it runs from `.venv-omni`.
 
 | | |
 |---|---|
-| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~6.6 GB, plus any translator you switched to |
+| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~4.3 GB, plus any translator or voice engine you switched to |
 | `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
 
 To clear them, activate this project's environment and remove them by name:
@@ -299,12 +299,13 @@ source .venv/bin/activate
 hf cache ls                    # what is cached, and how big
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/Kokoro-82M-bf16 \
             model/mlx-community/whisper-large-v3-turbo
 
-# only if you switched the translator in the console, or ran a version that
-# used Smart Turn; hf cache ls above shows which of these you actually have
-hf cache rm model/mlx-community/Qwen3-8B-4bit \
+# only if you switched the translator or the voice engine in the console, or ran
+# a version that used Smart Turn; hf cache ls above shows which you actually have
+hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit \
             model/pipecat-ai/smart-turn-v3
