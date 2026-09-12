@@ -126,7 +126,10 @@ sessions:
   asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*
 - **Microphone** — pick the input from a list, and watch the level meter while someone talks
   into it. This is the failure everyone hits, and the meter turns it into a five-second check
-  instead of a mystery. Switching device takes effect immediately.
+  instead of a mystery. Switching device takes effect immediately. The list is re-read from
+  CoreAudio each time the console loads, so a headset paired after startup shows up on a
+  refresh — mics are remembered by name, and one that is absent falls back to the system
+  default rather than failing.
 - **Listeners** — the QR code to hold up or print, and a count of how many phones are actually
   connected right now.
 - **Translation quality** — the language model, the voice, how much context to keep, and how
@@ -189,7 +192,9 @@ All of this lives in the console; the notes below are why each one is there.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
 - **Voice** — Qwen3-TTS sounds best. If `!! backlog, dropping audio` keeps appearing and a
-  smaller model has not fixed it, switch to Kokoro.
+  smaller model has not fixed it, switch to Kokoro. The bridge holds each turn's audio until
+  the voice has finished it, so the model and the voice taking turns on the GPU is heard as
+  a slightly later sentence rather than a stuttering one.
 
 ## What this is not
 

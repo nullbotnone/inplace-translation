@@ -27,11 +27,25 @@
 </footer>
 <audio id="a"></audio>
 <script>
-  b.onclick = () => {
+  const listen = () => {
     a.src = "/stream.mp3?" + Date.now();   // always join live, never a stale buffer
-    a.play().then(() => b.textContent = "🔊 Playing / 收听中")
-            .catch(e => b.textContent = e.message);
+    return a.play();
   };
+  b.onclick = () => listen().then(() => b.textContent = "🔊 Playing / 收听中")
+                            .catch(e => b.textContent = e.message);
+
+  // The stream ends on any wifi hiccup, and the server drops a listener whose phone falls
+  // behind. Nothing in <audio> retries, so without this the phone goes quiet for the rest
+  // of the sermon while the subtitles keep scrolling.
+  let retry = null;
+  ["ended", "error"].forEach((e) => a.addEventListener(e, () => {
+    if (!a.src || retry) return;
+    b.textContent = "… reconnecting / 重新连接";
+    retry = setTimeout(() => {
+      retry = null;
+      listen().then(() => b.textContent = "🔊 Playing / 收听中").catch(() => {});
+    }, 1000);
+  }));
 
   const es = new EventSource("/subs");
   es.onopen = () => log.innerHTML = "";    // reconnect replays the backlog, so start clean

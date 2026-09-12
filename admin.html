@@ -191,7 +191,7 @@
         <option value="mlx-community/Qwen3-4B-Instruct-2507-4bit"
                 data-zh="Qwen3 4B — 16 GB 的 Mac" data-tw="Qwen3 4B — 16 GB 的 Mac"
                 data-en="Qwen3 4B — for 16 GB Macs"></option>
-        <option value="mlx-community/Qwen3-8B-Instruct-4bit"
+        <option value="mlx-community/Qwen3-8B-4bit"
                 data-zh="Qwen3 8B — 更好，需要 24 GB" data-tw="Qwen3 8B — 更好，需要 24 GB"
                 data-en="Qwen3 8B — better, needs 24 GB"></option>
       </select>
@@ -353,8 +353,9 @@ function labels() {
   });
   if (deviceList) {
     const keep = $("device").value;
-    $("device").innerHTML = `<option value="">${t("sysdefault")}</option>` +
-      deviceList.map((d) => `<option value="${d.index}">${d.name} (${d.channels} ch)</option>`).join("");
+    // new Option() escapes; device names are whatever the vendor felt like putting in them
+    $("device").replaceChildren(new Option(t("sysdefault"), ""),
+      ...deviceList.map((d) => new Option(`${d.name} (${d.channels} ch)`, d.name)));
     $("device").value = keep;
   }
 }
@@ -445,7 +446,7 @@ $("themebtn").onclick = () => {
 CFG.forEach((key) => $(key).addEventListener("change", () => {
   const el = $(key);
   let value = el.type === "number" ? Number(el.value) : el.value;
-  if (key === "device") value = el.value === "" ? null : Number(el.value);
+  if (key === "device") value = el.value === "" ? null : el.value;
   post("/api/config", { [key]: value }).then((r) => {
     restartPending = r.restart_required;
     paint();

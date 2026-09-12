@@ -1,8 +1,10 @@
 """Self-check: python3 test_bridge.py"""
-import json, queue, signal, socket, tempfile, threading, time
+import base64, json, queue, signal, socket, sys, tempfile, threading, time
 from pathlib import Path
 
 import bridge
+
+b64 = lambda raw: base64.b64encode(raw).decode()
 
 tmp = Path(tempfile.mkdtemp())
 bridge.CONFIG_PATH = tmp / "config.json"
@@ -22,6 +24,28 @@ def run_pacer(seconds=0.3):
     t.start(); time.sleep(seconds); stop.set(); t.join(1)
     return s.w
 
+
+# a turn's audio is held until the TTS says it is done, then queued as one piece: played
+# gust by gust, the stalls where the LLM has the GPU land as silence inside words
+p_ws = bridge.Pipeline()
+p_ws.ws = [json.dumps(e) for e in (
+    {"type": "response.output_audio.delta", "delta": b64(b"\1\2")},
+    {"type": "response.output_audio_transcript.done", "transcript": "hi"},
+    {"type": "response.output_audio.delta", "delta": b64(b"\3\4")},
+    {"type": "response.output_audio.done"},
+    {"type": "response.output_audio.delta", "delta": b64(b"\5\6")},
+)]
+p_ws._read_ws()
+assert bridge.out_q.get_nowait() == b"\1\2\3\4", "a turn should arrive whole, not gust by gust"
+assert bridge.out_q.empty(), "audio for an unfinished turn should still be held"
+
+# ... unless the turn runs on: audio can be held back, but not indefinitely
+p_ws.ws = [json.dumps({"type": "response.output_audio.delta",
+                       "delta": b64(b"\0" * (bridge.MAX_HOLD_S * bridge.RATE * 2 + 2))})]
+p_ws._read_ws()
+assert not bridge.out_q.empty(), "a turn that never ends was never released"
+with bridge.out_q.mutex:
+    bridge.out_q.queue.clear()
 
 # silence when idle, at wall-clock rate (~50 blocks/s), not as fast as the CPU allows
 w = run_pacer()
@@ -112,8 +136,33 @@ assert p0._command()[p0._command().index("--language") + 1] == "auto"
 p1 = bridge.Pipeline()
 for bad in ({"source": "klingon"}, {"target": "zh-Hanzi"}, {"tts": "; rm -rf /"},
             {"target": "zh-Hans"}, {"chat_size": 99}, {"chat_size": "two"}, {"chat_size": True},
-            {"min_silence_ms": -1}, {"device": "webcam"}, {"model": ""}):
+            {"min_silence_ms": -1}, {"device": -1}, {"device": ""}, {"device": 1}, {"model": ""}):
     assert p1.update(bad) is False and p1.cfg == bridge.DEFAULTS, f"accepted {bad}"
+# the mic is stored by name, because indices shuffle whenever a Bluetooth device comes or goes
+assert p1.update({"device": "AirPods Pro"}) is False, "picking a mic should not need a restart"
+assert p1.cfg["device"] == "AirPods Pro"
+
+# a mic that is named in the config but not plugged in falls back to the system default,
+# because the built-in microphone beats no translation at all
+class FakeSD:
+    opened = None
+    @staticmethod
+    def query_devices(): return [{"name": "MacBook Pro Microphone", "max_input_channels": 1}]
+    @staticmethod
+    def RawInputStream(**kw):
+        FakeSD.opened = kw["device"]
+        return type("S", (), {"start": lambda self: None, "close": lambda self: None})()
+
+sys.modules["sounddevice"] = FakeSD
+p1.open_mic()
+assert FakeSD.opened is None, f"opened {FakeSD.opened!r} instead of falling back"
+p1.update({"device": "MacBook Pro Microphone"})
+p1.open_mic()
+assert FakeSD.opened == "MacBook Pro Microphone", f"opened {FakeSD.opened!r}"
+del sys.modules["sounddevice"]
+p1.mic = None
+p1.cfg = dict(bridge.DEFAULTS)
+
 assert p1.update({"source": "auto"}) is True, "spoken language should need a restart"
 assert p1.update({"target": "en"}) is False, "target only changes the prompt"
 
@@ -130,12 +179,12 @@ for legacy in ("zh-Hans", "zh-Hant"):
 
 # config: only known keys, persisted, and only model-ish changes demand a restart
 p = bridge.Pipeline()
-assert p.update({"device": 3}) is False, "changing the mic should not need a restart"
+assert p.update({"device": "AirPods Pro"}) is False, "changing the mic should not need a restart"
 assert p.update({"chat_size": 4}) is True, "changing context should need a restart"
 assert p.update({"chat_size": 4}) is False, "re-saving the same value is not a change"
 assert p.update({"nonsense": 1, "model": "m"}) is True
 saved = json.loads(bridge.CONFIG_PATH.read_text())
-assert saved["device"] == 3 and saved["chat_size"] == 4 and saved["model"] == "m"
+assert saved["device"] == "AirPods Pro" and saved["chat_size"] == 4 and saved["model"] == "m"
 assert "nonsense" not in saved, "unknown key reached the config file"
 assert set(saved) == set(bridge.DEFAULTS), "config file shape drifted from DEFAULTS"
 
@@ -181,6 +230,9 @@ assert blocked.local_only() is False and blocked.err == 403, "console exposed to
 # both, ffmpeg and the pipeline are orphaned.
 import os, subprocess, sys
 here = Path(__file__).parent
+# The child writes config.json in its own directory. Hold whatever the operator had saved
+# there and put it back afterwards, so running the self-check never costs them their setup.
+saved_config = (here / "config.json").read_bytes() if (here / "config.json").exists() else None
 proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start"],
                         cwd=here, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                         start_new_session=True)
@@ -204,7 +256,10 @@ try:
 finally:
     if proc.poll() is None:
         proc.kill()
-    (here / "config.json").unlink(missing_ok=True)
+    if saved_config is None:
+        (here / "config.json").unlink(missing_ok=True)
+    else:
+        (here / "config.json").write_bytes(saved_config)
 
 # stop() has to take the pipeline subprocess with it; that is the one that does not die
 # on its own when the bridge goes away.

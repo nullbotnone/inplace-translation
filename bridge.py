@@ -15,13 +15,14 @@ HERE = Path(__file__).resolve().parent
 S2S_PORT, HTTP_PORT = 8765, 8000
 RATE, BLOCK = 16000, 320          # 20 ms of s16le mono
 MAX_LAG_S = 20                    # translation backlog before we start dropping
+MAX_HOLD_S = 8                    # longest single turn held whole before it has to go out
 MAX_QUEUED = 60                   # mp3 chunks buffered per listener (~10 s) before eviction
 LOAD_TIMEOUT_S = 900              # first run downloads ~6.6 GB before the port answers
 
 CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
 DEFAULTS = {
-    "device": None,                                              # mic; None = system default
+    "device": None,                                              # mic, by name; None = system default
     "source": "en",                                              # what the preacher speaks
     "target": "zh",                                              # what listeners hear
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
@@ -53,17 +54,42 @@ def valid(key, value):
         lo, hi = BOUNDS[key]
         return isinstance(value, int) and not isinstance(value, bool) and lo <= value <= hi
     if key == "device":
-        return value is None or (isinstance(value, int) and value >= 0)
+        # Names, not indices: an index shuffles every time a Bluetooth mic comes or goes, so
+        # a saved one silently opens some other microphone. An index left in an old config is
+        # rejected on load and the console falls back to the system default.
+        return value is None or (isinstance(value, str) and value.strip() != "")
     return isinstance(value, str) and value.strip() != ""
+
+# One worked pair per direction. A small model that is *told* not to answer still answers;
+# shown one utterance it would rather reply to, it stops.
+EXAMPLE = {
+    "zh": ("Do you know what that means? Turn with me to John 3.",
+           "你知道那是什么意思吗？请和我一起翻到约翰福音 3 章。"),
+    "en": ("你知道那是什么意思吗？请和我一起翻到约翰福音 3 章。",
+           "Do you know what that means? Turn with me to John 3."),
+}
+
 
 def base_prompt(cfg):
     target = TARGETS[cfg["target"]]
+    heard, said = EXAMPLE[cfg["target"]]
     return f"""You are a simultaneous interpreter for a church sermon.
 The speaker is talking in {SPOKEN[cfg["source"]]}. Translate every utterance into {target}.
-Output ONLY the {target} translation, nothing else: no greetings, no commentary, no quotes,
-no explanation of your reasoning. Preserve the speaker's first person voice and register.
-Keep Bible book/chapter/verse references and proper names exact.
-If an utterance is unintelligible, or is already in {target}, output nothing."""
+
+- Output ONLY the {target} translation of the current utterance: no greetings, no commentary,
+  no quotes, no labels, no explanation of your reasoning.
+- Translate, never reply. A question stays a question and a command stays a command: you
+  answer nothing, agree with nothing, and preach nothing of your own.
+- Sentence for sentence. Do not summarise, shorten, expand, or add anything the speaker did
+  not say. Preserve the speaker's first person voice and register.
+- Keep Bible book/chapter/verse references and proper names exact.
+- Earlier turns are context for names and terminology only. Never re-translate them and never
+  continue your own previous answer.
+- If the utterance is a fragment, translate the fragment as it stands; do not finish the thought.
+- If an utterance is unintelligible, or is already in {target}, output nothing.
+
+Speaker: {heard}
+You: {said}"""
 
 
 def load_config():
@@ -220,6 +246,7 @@ class Pipeline:
             from websockets.sync.client import connect
             self.ws = connect(f"ws://127.0.0.1:{S2S_PORT}/v1/realtime", max_size=None)
             self.apply_instructions()
+            rescan()
             self.open_mic()
             threading.Thread(target=self._read_ws, daemon=True).start()
             self._set("running", "translating")
@@ -270,6 +297,13 @@ class Pipeline:
         if self.mic:
             with contextlib.suppress(Exception):
                 self.mic.close()
+            self.mic = None
+        want = self.cfg["device"]
+        if isinstance(want, str) and not any(d["name"] == want and d["max_input_channels"] > 0
+                                             for d in sd.query_devices()):
+            # AirPods that wandered off mid-sermon. The built-in mic beats no translation.
+            print(f"!! {want} is not connected, using the system default", flush=True)
+            want = None
 
         def cb(indata, frames, t, status):
             raw = bytes(indata)
@@ -280,17 +314,29 @@ class Pipeline:
                                          "audio": base64.b64encode(raw).decode()}))
 
         self.mic = sd.RawInputStream(samplerate=RATE, channels=1, dtype="int16",
-                                     device=self.cfg["device"], blocksize=BLOCK * 4, callback=cb)
+                                     device=want, blocksize=BLOCK * 4, callback=cb)
         self.mic.start()
 
     def _read_ws(self):
+        # The translator and the voice share one GPU lock, so a turn's audio arrives in
+        # gusts: the TTS stalls every time the language model takes the lock to write the
+        # next sentence. Played as it lands, that silence lands inside words. Hold the turn
+        # until the TTS says it is finished, then hand it over as one piece.
+        held = bytearray()
         try:
             for msg in self.ws:
                 ev = json.loads(msg)
                 t = ev.get("type", "")
                 # GA calls it response.output_audio.delta; older builds response.audio.delta
                 if t.endswith("audio.delta") and "transcript" not in t:
-                    out_q.put(base64.b64decode(ev["delta"]))
+                    held += base64.b64decode(ev["delta"])
+                    if len(held) > MAX_HOLD_S * RATE * 2:
+                        out_q.put(bytes(held))      # a turn this long is not going to end soon
+                        held.clear()
+                elif t.endswith("audio.done") and "transcript" not in t:
+                    if held:
+                        out_q.put(bytes(held))
+                        held.clear()
                 elif "input_audio_transcription" in t and t.endswith((".completed", ".done")):
                     subtitle("src", ev.get("transcript", ""))
                 elif t.endswith("audio_transcript.done"):
@@ -321,12 +367,30 @@ class Pipeline:
 pipeline = Pipeline()
 
 
+def rescan():
+    """PortAudio snapshots the audio devices when it starts and never looks again, so a
+    headset paired after that is invisible -- and `device: null` keeps resolving to whatever
+    was the system default back then. Restarting it is the only rescan PortAudio offers.
+    It closes every open stream, hence reopening the mic."""
+    import sounddevice as sd
+    live = pipeline.mic is not None
+    if live:
+        with contextlib.suppress(Exception):
+            pipeline.mic.close()
+        pipeline.mic = None
+    sd._terminate()
+    sd._initialize()
+    if live:
+        pipeline.open_mic()
+
+
 def devices():
     """A broken or missing PortAudio is a real macOS failure; say so instead of 500ing."""
     try:
         import sounddevice as sd
-        return {"devices": [{"index": i, "name": d["name"], "channels": d["max_input_channels"]}
-                            for i, d in enumerate(sd.query_devices())
+        rescan()
+        return {"devices": [{"name": d["name"], "channels": d["max_input_channels"]}
+                            for d in sd.query_devices()
                             if d["max_input_channels"] > 0], "error": ""}
     except Exception as exc:
         return {"devices": [], "error": f"Cannot read audio devices: {exc}"}
@@ -342,18 +406,26 @@ def broadcast_died(why):
 
 def pacer(stdin, stop=None):
     """Feed ffmpeg at wall-clock rate: translated audio when we have it, silence otherwise."""
-    silence, buf = b"\0" * (BLOCK * 2), b""
+    # pos walks through buf rather than reslicing it: buf now holds a whole turn, and
+    # copying a quarter of a megabyte fifty times a second is not what this thread is for.
+    silence, buf, pos = b"\0" * (BLOCK * 2), b"", 0
     t0, n = time.monotonic(), 0
     while not (stop and stop.is_set()):
-        while len(buf) < BLOCK * 2 and not out_q.empty():
-            buf += out_q.get_nowait()
+        while len(buf) - pos < BLOCK * 2 and not out_q.empty():
+            buf, pos = buf[pos:] + out_q.get_nowait(), 0
         # ponytail: drop oldest on backlog. A faster speaker than the TTS drifts forever
         # otherwise. Upgrade path if this fires often: shrink chat_size, faster TTS.
-        if out_q.qsize() * BLOCK * 2 > MAX_LAG_S * RATE * 2:
+        # In bytes, not items: a queued item is a whole turn, a word or MAX_HOLD_S of speech.
+        with out_q.mutex:
+            queued = sum(len(chunk) for chunk in out_q.queue)
+        if queued + len(buf) - pos > MAX_LAG_S * RATE * 2:
             print("!! backlog, dropping audio", flush=True)
             with out_q.mutex:
                 out_q.queue.clear()
-        chunk, buf = (buf[:BLOCK * 2], buf[BLOCK * 2:]) if len(buf) >= BLOCK * 2 else (silence, buf)
+        if len(buf) - pos >= BLOCK * 2:
+            chunk, pos = buf[pos:pos + BLOCK * 2], pos + BLOCK * 2
+        else:
+            chunk = silence
         try:
             stdin.write(chunk)
             stdin.flush()
@@ -432,7 +504,10 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         self.wfile.write(self.frame(q.get(timeout=15)))
                     except queue.Empty:
-                        self.wfile.write(b":\n\n")      # keep a dozing phone's socket open
+                        # An SSE comment keeps a dozing phone's socket open. It must never go
+                        # down /stream.mp3, where those bytes land inside an audio frame.
+                        if content_type.startswith("text/"):
+                            self.wfile.write(b":\n\n")
             except Exception:
                 pass
 
