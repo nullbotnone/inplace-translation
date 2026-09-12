@@ -195,9 +195,9 @@
       <select id="source">
         <option value="en" data-zh="英文" data-tw="英文" data-en="English"></option>
         <option value="zh" data-zh="中文" data-tw="中文" data-en="Chinese"></option>
-        <option value="auto" data-zh="自动判断（讲员会换语言时用）"
-                data-tw="自動判斷（講員會換語言時用）"
-                data-en="Detect automatically — if they switch"></option>
+        <option value="auto" data-zh="自动判断（讲员会切换语言时）"
+                data-tw="自動判斷（講員會切換語言時）"
+                data-en="Detect automatically (bilingual preaching)"></option>
       </select>
     </label>
     <label>
@@ -218,12 +218,12 @@
     </label>
     <div class="row actions-inline">
       <button id="rescan" data-zh="重新扫描设备" data-tw="重新掃描裝置"
-              data-en="Look for new devices"></button>
+              data-en="Rescan devices"></button>
     </div>
     <p class="hint"
-       data-zh="蓝牙耳机是在这个页面打开之后才连上的，就点一下——设备列表只在页面加载时读一次。"
-       data-tw="藍牙耳機是在這個頁面打開之後才連上的，就點一下——裝置清單只在頁面載入時讀一次。"
-       data-en="Click this if you paired a headset after opening this page — the list is only read when the page loads."></p>
+       data-zh="设备列表在页面载入时读取一次。连接麦克风或耳机后，请重新扫描。"
+       data-tw="裝置清單在頁面載入時讀取一次。連接麥克風或耳機後，請重新掃描。"
+       data-en="The device list is read when this page loads. Rescan after connecting a microphone or headset."></p>
     <div class="meter"><i id="level"></i></div>
     <p class="hint" id="levelhint"></p>
   </section>
@@ -233,38 +233,38 @@
     <label>
       <span data-zh="引擎" data-tw="引擎" data-en="Engine"></span>
       <select id="engine">
-        <option value="cascade" data-zh="Whisper + 翻译模型 → 语音（稳定，主日用这个）"
-                data-tw="Whisper + 翻譯模型 → 語音（穩定，主日用這個）"
-                data-en="Whisper + a translator → speech (steady; use this on a Sunday)"></option>
-        <option value="omni" data-zh="Qwen3-Omni 30B — 语音直入，省去识别（实验，需 64 GB）"
-                data-tw="Qwen3-Omni 30B — 語音直入，省去辨識（實驗，需 64 GB）"
-                data-en="Qwen3-Omni 30B — audio straight in, no recogniser (experimental, 64 GB)"></option>
+        <option value="cascade" data-zh="Whisper → 翻译模型 → 语音（稳定，建议主日使用）"
+                data-tw="Whisper → 翻譯模型 → 語音（穩定，建議主日使用）"
+                data-en="Whisper → translator → speech (stable; recommended for services)"></option>
+        <option value="omni" data-zh="Qwen3-Omni 30B — 直接处理语音，无需识别（实验功能，需 64 GB）"
+                data-tw="Qwen3-Omni 30B — 直接處理語音，無需辨識（實驗功能，需 64 GB）"
+                data-en="Qwen3-Omni 30B — direct audio translation, no recogniser (experimental; requires 64 GB)"></option>
       </select>
     </label>
     <label data-cascade-only>
       <span data-zh="语言模型" data-tw="語言模型" data-en="Language model"></span>
       <select id="model">
         <option value="mlx-community/Qwen3-4B-Instruct-2507-4bit"
-                data-zh="Qwen3 4B — 16 GB 的 Mac" data-tw="Qwen3 4B — 16 GB 的 Mac"
-                data-en="Qwen3 4B — for 16 GB Macs"></option>
+                data-zh="Qwen3 4B — 需 16 GB" data-tw="Qwen3 4B — 需 16 GB"
+                data-en="Qwen3 4B — requires 16 GB"></option>
         <option value="mlx-community/Qwen3-8B-4bit"
-                data-zh="Qwen3 8B — 更好，需要 24 GB" data-tw="Qwen3 8B — 更好，需要 24 GB"
-                data-en="Qwen3 8B — better, needs 24 GB"></option>
+                data-zh="Qwen3 8B — 品质较佳，需 24 GB" data-tw="Qwen3 8B — 品质较佳，需 24 GB"
+                data-en="Qwen3 8B — higher quality; requires 24 GB"></option>
         <option value="mlx-community/Qwen3.6-35B-A3B-8bit"
-                data-zh="Qwen3.6 35B — 圣经书卷名可靠，需要 64 GB"
-                data-tw="Qwen3.6 35B — 聖經書卷名可靠，需要 64 GB"
-                data-en="Qwen3.6 35B — reliable book names, needs 64 GB"></option>
+                data-zh="Qwen3.6 35B — 圣经书卷名最准确，需 64 GB"
+                data-tw="Qwen3.6 35B — 聖經書卷名最準確，需 64 GB"
+                data-en="Qwen3.6 35B — most accurate Bible references; requires 64 GB"></option>
       </select>
     </label>
     <p class="hint" id="enginehint"></p>
     <label>
       <span data-zh="语音" data-tw="語音" data-en="Voice"></span>
       <select id="tts">
-        <option value="qwen3" data-zh="Qwen3-TTS — 最好听" data-tw="Qwen3-TTS — 最好聽"
-                data-en="Qwen3-TTS — best sounding"></option>
-        <option value="kokoro" data-zh="Kokoro — 更快，跟不上时用"
-                data-tw="Kokoro — 更快，跟不上時用"
-                data-en="Kokoro — faster, use if it falls behind"></option>
+        <option value="qwen3" data-zh="Qwen3-TTS — 音质最佳" data-tw="Qwen3-TTS — 音質最佳"
+                data-en="Qwen3-TTS — highest quality"></option>
+        <option value="kokoro" data-zh="Kokoro — 速度较快，语音跟不上时使用"
+                data-tw="Kokoro — 速度較快，語音跟不上時使用"
+                data-en="Kokoro — faster; use if the voice falls behind"></option>
       </select>
     </label>
     <div class="row">
@@ -284,9 +284,9 @@
       </label>
     </div>
     <p class="hint"
-       data-zh="语音断断续续就把缓冲调大，嫌慢就调小。立刻生效，不用重启。"
-       data-tw="語音斷斷續續就把緩衝調大，嫌慢就調小。立刻生效，不用重啟。"
-       data-en="Raise the voice buffer if the audio chops, lower it if the voice lags behind. Applies at once — no restart."></p>
+       data-zh="语音断续时调大，语音落后讲员时调小。立即生效，无需重启。"
+       data-tw="語音斷續時調大，語音落後講員時調小。立即生效，無需重啟。"
+       data-en="Increase if the audio breaks up; decrease if the voice falls behind the preacher. Applies immediately; no restart required."></p>
     <p class="hint" id="restarthint"></p>
   </section>
 
@@ -310,9 +310,9 @@
       <span class="count" id="glossarycount"></span>
     </div>
     <p class="hint"
-       data-zh="告诉翻译该怎么处理你们的专有名词。每句话都会带上这份词表，所以越短越好。以 # 开头的行是给你自己看的注释，不会进模型。保存后下一句就生效，不用重启。"
-       data-tw="告訴翻譯該怎麼處理你們的專有名詞。每句話都會帶上這份詞表，所以越短越好。以 # 開頭的行是給你自己看的註解，不會進模型。儲存後下一句就生效，不用重啟。"
-       data-en="Tells the translator how to handle your proper nouns. It rides along with every sentence, so keep it short. Lines starting with # are notes to yourself and never reach the model. Saved changes apply to the next sentence — no restart."></p>
+       data-zh="指定专有名词的译法。每句话都会附上此词表，请尽量简短。以 # 开头的行为注释，不会送入模型。保存后于下一句生效，无需重启。"
+       data-tw="指定專有名詞的譯法。每句話都會附上此詞表，請盡量簡短。以 # 開頭的行為註解，不會送入模型。儲存後於下一句生效，無需重啟。"
+       data-en="Defines how proper nouns are translated. It is sent with every sentence, so keep it brief. Lines beginning with # are comments and are never sent to the model. Changes apply to the next sentence; no restart required."></p>
     <textarea id="glossary" spellcheck="false"></textarea>
     <div class="row actions-inline">
       <button id="savegloss" data-zh="保存词表" data-tw="儲存詞表" data-en="Save glossary"></button>
@@ -327,8 +327,8 @@
       <button class="compact" id="clearlog" type="button" data-zh="清空" data-tw="清空"
               data-en="Clear"></button>
     </div>
-    <ul id="log"><li class="empty" data-zh="还没有内容。" data-tw="還沒有內容。"
-                     data-en="Nothing yet."></li></ul>
+    <ul id="log"><li class="empty" data-zh="暂无字幕。" data-tw="暫無字幕。"
+                     data-en="No transcript yet."></li></ul>
   </section>
 
 </div>
@@ -344,37 +344,37 @@ const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 
 /* Strings the server or the meters produce at runtime, which no data- attribute can carry. */
 const STR = {
-  zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台断开",
-        sysdefault:"系统默认", rescanned:"设备已重新扫描", omniignores:"语音直入模式下，讲员语言、语言模型、上下文都用不到——模型自己听、自己判断。", omnilang:"听众听到{b}。讲员说什么语言由模型自己判断。", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
-        copied:"听众链接已复制", copyfailed:"无法复制 — 请手动选择链接", cleared:"字幕已清空",
-        requestfailed:"操作失败 — 请检查控制台连接", glossarycount:"{n} 个字符",
-        restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
-        micprompt:"对着麦克风说话，这条会动。", micgood:"声音正常。",
-        micsilent:"没有声音进来 — 检查线和上面选的设备。", micclip:"爆音了 — 把音控台的输出调小。",
-        direction:"{a} 讲道 → 听众听到 {b}。", samelang:"讲员说的和听众听到的是同一种语言，不会有翻译。",
-        autolang:"讲员语言设为「自动」：凡是用{b}讲的都不会翻译，听众那边是静音。讲道用哪种语言就选哪种。",
+  zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台连接中断",
+        sysdefault:"系统默认", rescanned:"设备已重新扫描", omniignores:"Qwen3-Omni 直接处理语音，讲员语言、语言模型与上下文设定均不适用。", omnilang:"听众听到{b}。讲道语言由模型自动侦测。", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入。请依贵会需要修改后保存。",
+        copied:"听众链接已复制", copyfailed:"复制失败，请手动选取链接。", cleared:"字幕已清空",
+        requestfailed:"操作失败，请检查控制台连接。", glossarycount:"{n} 个字符",
+        restarting:"正在重启。模型加载约需一分钟。", restartneeded:"需要重启方可生效，新模型须重新加载。",
+        micprompt:"请对麦克风讲话，音量条应有反应。", micgood:"输入音量正常。",
+        micsilent:"未侦测到音频输入，请检查线路与所选设备。", micclip:"输入音量过载，请调低音控台的输出电平。",
+        direction:"讲道语言为{a}，听众听到{b}。", samelang:"讲道语言与听众语言相同，不会进行翻译。",
+        autolang:"讲员语言设为自动侦测。以{b}讲道的内容将不会翻译，听众端为静音。请指定讲道所用语言。",
         heard:"听到", translated:"翻译" },
-  tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
-        sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"語音直入模式下，講員語言、語言模型、上下文都用不到——模型自己聽、自己判斷。", omnilang:"聽眾聽到{b}。講員說什麼語言由模型自己判斷。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
-        copied:"聽眾連結已複製", copyfailed:"無法複製 — 請手動選取連結", cleared:"字幕已清空",
-        requestfailed:"操作失敗 — 請檢查控制台連線", glossarycount:"{n} 個字元",
-        restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
-        micprompt:"對著麥克風說話，這條會動。", micgood:"聲音正常。",
-        micsilent:"沒有聲音進來 — 檢查線和上面選的裝置。", micclip:"爆音了 — 把音控台的輸出調小。",
-        direction:"{a} 講道 → 聽眾聽到 {b}。", samelang:"講員說的和聽眾聽到的是同一種語言，不會有翻譯。",
-        autolang:"講員語言設為「自動」：凡是用{b}講的都不會翻譯，聽眾那邊是靜音。講道用哪種語言就選哪種。",
+  tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台連線中斷",
+        sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"Qwen3-Omni 直接處理語音，講員語言、語言模型與上下文設定均不適用。", omnilang:"聽眾聽到{b}。講道語言由模型自動偵測。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入。請依貴會需要修改後儲存。",
+        copied:"聽眾連結已複製", copyfailed:"複製失敗，請手動選取連結。", cleared:"字幕已清空",
+        requestfailed:"操作失敗，請檢查控制台連線。", glossarycount:"{n} 個字元",
+        restarting:"正在重啟。模型載入約需一分鐘。", restartneeded:"需要重啟方可生效，新模型須重新載入。",
+        micprompt:"請對麥克風講話，音量條應有反應。", micgood:"輸入音量正常。",
+        micsilent:"未偵測到音訊輸入，請檢查線路與所選裝置。", micclip:"輸入音量過載，請調低音控台的輸出電平。",
+        direction:"講道語言為{a}，聽眾聽到{b}。", samelang:"講道語言與聽眾語言相同，不會進行翻譯。",
+        autolang:"講員語言設為自動偵測。以{b}講道的內容將不會翻譯，聽眾端為靜音。請指定講道所用語言。",
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
-        nolink:"no console link", sysdefault:"System default", rescanned:"Device list refreshed", omniignores:"Qwen3-Omni hears the sermon itself, so the spoken language, the language model and the context setting are not used.", omnilang:"Listeners hear {b}. The audio model works out what the preacher is speaking on its own.", saved:"Saved",
-        glossarysaved:"Glossary saved", exampleadded:"Example added — edit it for your church, then save", restarting:"Restarting — models take a minute",
-        copied:"Listener link copied", copyfailed:"Could not copy — select the link manually", cleared:"Transcript cleared",
-        requestfailed:"Action failed — check the console connection", glossarycount:"{n} characters",
-        restartneeded:"Restart to apply — the new model has to load.",
-        micprompt:"Speak into the mic — the bar should move.", micgood:"Audio looks good.",
-        micsilent:"No audio reaching the Mac — check the cable and the device above.",
-        micclip:"Clipping — turn the send down at the desk.",
-        direction:"Preached in {a}, heard as {b}.", samelang:"Source and target are the same language — nothing will be translated.",
-        autolang:"Source is Auto, so anything preached in {b} is passed over and the listeners hear silence. Pick the language the sermon is in.",
+        nolink:"console disconnected", sysdefault:"System default", rescanned:"Device list refreshed", omniignores:"Qwen3-Omni processes the audio directly. The spoken language, language model and context settings do not apply.", omnilang:"Listeners hear {b}. The audio model detects the spoken language automatically.", saved:"Saved",
+        glossarysaved:"Glossary saved", exampleadded:"Example inserted. Edit it for your congregation, then save.", restarting:"Restarting. Loading the models takes a minute.",
+        copied:"Listener link copied", copyfailed:"Copy failed. Select the link manually.", cleared:"Transcript cleared",
+        requestfailed:"Request failed. Check the console connection.", glossarycount:"{n} characters",
+        restartneeded:"Restart required. The new model must load first.",
+        micprompt:"Speak into the microphone. The level meter should respond.", micgood:"Input level is normal.",
+        micsilent:"No audio input detected. Check the cable and the selected device.",
+        micclip:"Input is clipping. Reduce the send level at the mixing desk.",
+        direction:"Preached in {a}; listeners hear {b}.", samelang:"Source and target languages are identical. Nothing will be translated.",
+        autolang:"Source is set to automatic. Anything preached in {b} is left untranslated and listeners hear silence. Select the language of the sermon.",
         heard:"HEARD", translated:"TRANSLATED" },
 };
 
@@ -644,9 +644,9 @@ $("rescan").addEventListener("click", () => loadDevices().then(() => toast("resc
 $("clearlog").onclick = () => {
   const empty = document.createElement("li");
   empty.className = "empty";
-  empty.dataset.zh = "还没有内容。";
-  empty.dataset.tw = "還沒有內容。";
-  empty.dataset.en = "Nothing yet.";
+  empty.dataset.zh = "暂无字幕。";
+  empty.dataset.tw = "暫無字幕。";
+  empty.dataset.en = "No transcript yet.";
   empty.textContent = empty.dataset[lang];
   $("log").replaceChildren(empty);
   toast("cleared");
