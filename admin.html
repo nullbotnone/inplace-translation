@@ -179,6 +179,14 @@
       <span data-zh="输入设备" data-tw="輸入裝置" data-en="Input device"></span>
       <select id="device"></select>
     </label>
+    <div class="row actions-inline">
+      <button id="rescan" data-zh="重新扫描设备" data-tw="重新掃描裝置"
+              data-en="Look for new devices"></button>
+    </div>
+    <p class="hint"
+       data-zh="蓝牙耳机是在这个页面打开之后才连上的，就点一下——设备列表只在页面加载时读一次。"
+       data-tw="藍牙耳機是在這個頁面打開之後才連上的，就點一下——裝置清單只在頁面載入時讀一次。"
+       data-en="Click this if you paired a headset after opening this page — the list is only read when the page loads."></p>
     <div class="meter"><i id="level"></i></div>
     <p class="hint" id="levelhint"></p>
   </div>
@@ -277,21 +285,21 @@ const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
 /* Strings the server or the meters produce at runtime, which no data- attribute can carry. */
 const STR = {
   zh: { stopped:"已停止", starting:"启动中", running:"运行中", error:"出错", nolink:"控制台断开",
-        sysdefault:"系统默认", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
+        sysdefault:"系统默认", rescanned:"设备已重新扫描", saved:"已保存", glossarysaved:"词表已保存", exampleadded:"示例已插入 — 改成你们自己的，再保存",
         restarting:"正在重启 — 模型加载要一分钟", restartneeded:"需要重启才能生效 — 新模型要重新加载。",
         micprompt:"对着麦克风说话，这条会动。", micgood:"声音正常。",
         micsilent:"没有声音进来 — 检查线和上面选的设备。", micclip:"爆音了 — 把音控台的输出调小。",
         direction:"{a} 讲道 → 听众听到 {b}。", samelang:"讲员说的和听众听到的是同一种语言，不会有翻译。",
         heard:"听到", translated:"翻译" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台斷線",
-        sysdefault:"系統預設", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
+        sysdefault:"系統預設", rescanned:"裝置已重新掃描", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入 — 改成你們自己的，再儲存",
         restarting:"正在重啟 — 模型載入要一分鐘", restartneeded:"需要重啟才會生效 — 新模型要重新載入。",
         micprompt:"對著麥克風說話，這條會動。", micgood:"聲音正常。",
         micsilent:"沒有聲音進來 — 檢查線和上面選的裝置。", micclip:"爆音了 — 把音控台的輸出調小。",
         direction:"{a} 講道 → 聽眾聽到 {b}。", samelang:"講員說的和聽眾聽到的是同一種語言，不會有翻譯。",
         heard:"聽到", translated:"翻譯" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
-        nolink:"no console link", sysdefault:"System default", saved:"Saved",
+        nolink:"no console link", sysdefault:"System default", rescanned:"Device list refreshed", saved:"Saved",
         glossarysaved:"Glossary saved", exampleadded:"Example added — edit it for your church, then save", restarting:"Restarting — models take a minute",
         restartneeded:"Restart to apply — the new model has to load.",
         micprompt:"Speak into the mic — the bar should move.", micgood:"Audio looks good.",
@@ -470,12 +478,20 @@ CFG.forEach((key) => $(key).addEventListener("change", () => {
 
 fetch("/api/glossary").then((r) => r.json()).then(({ text }) => { $("glossary").value = text; });
 
-fetch("/api/devices").then((r) => r.json()).then(({ devices, error }) => {
-  deviceList = devices;
-  render();
-  if (current) $("device").value = current.config.device ?? "";
-  if (error) { $("levelhint").textContent = error; $("levelhint").className = "hint warn"; }
-});
+const loadDevices = () =>
+  fetch("/api/devices").then((r) => r.json()).then(({ devices, error }) => {
+    deviceList = devices;
+    render();
+    // render() restores whatever was selected; the saved mic wins on the first load
+    if (current) $("device").value = current.config.device ?? "";
+    if (error) { $("levelhint").textContent = error; $("levelhint").className = "hint warn"; }
+  });
+
+loadDevices();
+// PortAudio only notices a headset that was paired later when it is torn down and brought
+// back up, which is what /api/devices does. Nothing else on this page may trigger that: it
+// closes and reopens the mic, so it stays on a button the operator presses.
+$("rescan").addEventListener("click", () => loadDevices().then(() => toast("rescanned")));
 
 function addLine(line) {
   const log = $("log");

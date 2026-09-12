@@ -27,6 +27,7 @@ function el(tag = "div") {
       if (kids) kids.splice(kids.indexOf(this), 1);
     },
     focus() {}, setSelectionRange() {}, addEventListener() {},
+    replaceChildren(...kids) { e.children = kids; kids.forEach((k) => (k.parent = e)); },
     scrollHeight: 0, scrollTop: 0, clientHeight: 0,
   };
   let text = "";
@@ -56,10 +57,17 @@ const sandbox = {
     createElement: (t) => el(t),
     addEventListener() {},
   },
+  Option: function (text, value) { const o = el("option"); o.text = text; o.value = value; return o; },
   localStorage: { getItem: () => null, setItem() {} },
   matchMedia: () => ({ matches: false }),          // OS prefers dark
   navigator: { language: "en-US" },
-  fetch: () => new Promise(() => {}),          // never resolves: we drive state by hand
+  // Everything but the device list is driven by hand below. /api/devices has to answer,
+  // because the picker it fills is the one part of this page built from data the Mac
+  // supplies at runtime -- and a stub that never answers leaves that branch unexecuted.
+  fetch: (path) => path === "/api/devices"
+    ? Promise.resolve({ ok: true, json: () => Promise.resolve(
+        { devices: [{ name: "Jie\u2019s AirPods Pro", channels: 1 }], error: "" }) })
+    : new Promise(() => {}),
   EventSource: class {
     addEventListener(name, fn) { listeners[name] = fn; }
     set onopen(fn) { listeners.open = fn; }
@@ -163,4 +171,14 @@ for (const [k, v] of Object.entries(shown)) {
   if (v === "" || v === undefined) { console.error(`#${k} was never filled in`); process.exit(1); }
 }
 if (byId.url.textContent !== status.url) { console.error("#url wrong"); process.exit(1); }
-console.log(`ok: console script runs; painted ${Object.keys(shown).join(", ")}`);
+// The picker is filled from an async fetch, so it is only populated on the next tick.
+// A headset paired after the page loaded has to be reachable without a reload.
+setTimeout(() => {
+  const opts = byId.device.children.map((o) => o.text);
+  if (!opts.some((o) => String(o).includes("AirPods"))) {
+    console.error(`the device picker was never filled: ${JSON.stringify(opts)}`);
+    process.exit(1);
+  }
+  console.log(`ok: console script runs; painted ${Object.keys(shown).join(", ")};`
+    + ` device picker filled from /api/devices (${opts.length} entries)`);
+}, 0);
