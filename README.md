@@ -9,7 +9,9 @@ no app, just a browser tab. Nothing leaves the building.
 mic ─▶ bridge.py ──┼─▶ /subs (subtitles) ─────┴─▶ phones on the church wifi
        │           └─▶ /admin ──────────────────▶ you, on this Mac only
        │
-       └─ spawns: speech-to-speech serve  (VAD → STT → LLM → TTS)
+       └─ spawns: speech-to-speech serve
+                    cascade:  VAD → Whisper → translator → Qwen3-TTS
+                    omni:     VAD → Qwen3-Omni ─────────→ Qwen3-TTS
 ```
 
 `bridge.py` starts the pipeline, so there is one thing to run and one page to drive it.
@@ -23,6 +25,12 @@ also covers deaf members and anyone the TTS voice doesn't work for.
 the "reply" is a translation. `bridge.py` adds the part it has no concept of: one speaker,
 many listeners.
 
+The **omni** engine is the same pipeline with the recogniser removed: the turn's audio goes
+straight into a model that hears, and the translation comes back as text for the same voice to
+speak. It is opt-in and experimental — `experiments/README.md` has the measurements and the
+three things that had to be worked around, including the small proxy `bridge.py` serves at
+`/omni/v1` to make the pipeline and the audio model agree on where instructions go.
+
 ## Hardware
 
 Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
@@ -31,8 +39,8 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 |---|---|
 | Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Qwen3-TTS is ~7.5 GB of weights, plus caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
-| Book names right | **64 GB+**, which buys the 35 B — the only one that gets 约翰二书 right |
-| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv. The 35 B adds 35 GB on top |
+| Book names right | **64 GB+**, which buys the 35 B translator — the only one that gets 约翰二书 right — and the optional omni engine |
+| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 35 GB, and the omni engine another 36 GB |
 
 Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
 MLX inference; on battery the Mac throttles and the translation falls behind.
@@ -50,6 +58,15 @@ git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install speech-to-speech segno      # segno is optional, only for the QR code
+```
+
+The omni engine is optional and needs a second environment, because `mlx-vlm` pulls a newer
+mlx than the pipeline is pinned to. Skip this unless you want it:
+
+```bash
+python3 -m venv .venv-omni
+.venv-omni/bin/pip install mlx-vlm
+.venv-omni/bin/hf download mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit   # 36 GB
 ```
 
 **Prefer somewhere outside Documents, Desktop and Downloads.** macOS protects those three
@@ -127,14 +144,18 @@ sessions:
   asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*
 - **Microphone** — pick the input from a list, and watch the level meter while someone talks
   into it. This is the failure everyone hits, and the meter turns it into a five-second check
-  instead of a mystery. Switching device takes effect immediately. The list is re-read from
-  CoreAudio each time the console loads, so a headset paired after startup shows up on a
-  refresh — mics are remembered by name, and one that is absent falls back to the system
-  default rather than failing.
+  instead of a mystery. Switching device takes effect immediately. The list is read when the
+  page loads, so **Rescan devices** is there for a headset paired after that. Mics are
+  remembered by name, and one that is absent falls back to the system default rather than
+  failing — and if a mic disappears mid-sermon the bridge notices within a few seconds and
+  reopens it, rather than sitting there translating silence.
 - **Listeners** — the QR code to hold up or print, and a count of how many phones are actually
   connected right now.
-- **Translation quality** — the language model, the voice, how much context to keep, and how
-  long a pause ends a sentence. These need a restart, and the console says so when it matters.
+- **Translation quality** — the engine, the language model, the voice, how much context to
+  keep, how long a pause ends a sentence, and how much voice to buffer before playing. Most
+  need a restart and the console says so when it matters; the voice buffer applies at once.
+  Choosing the omni engine greys out the three settings it does not use — the spoken language,
+  the language model and the context — rather than leaving them there to be set pointlessly.
 - **Glossary** — edit it in the browser. Saved changes apply to the very next sentence, no
   restart, because the prompt is rebuilt per session update.
 - **Live transcript** — what was heard and what was said, as it happens.
@@ -178,36 +199,40 @@ Four things to get right on a Mac that nobody logs into on Sunday morning:
 
 All of this lives in the console; the notes below are why each one is there.
 
-- **Model** — the smaller models get Bible book names wrong in a specific way: they calque
-  the English ordinal, so "Second John" becomes 第二封约翰书 instead of 约翰二书, and 4B
-  renders a bare "John" as 约翰书 rather than 约翰福音. Scored on 72 book references,
-  greedy: Qwen3 4B 20/28 on the short set, Qwen3 8B 58/72, Qwen3.6 35B-A3B 68/72 — and all
-  four of the 35B's misses are it correctly naming the prophet rather than the book. No
-  prompt wording fixed the 8B; the variants that helped the numbered books broke plain
-  "John". If book names matter to your congregation and the Mac has the memory, this is the
-  setting that fixes them. The 35B is a mixture-of-experts with ~3B active, so it costs
-  0.5 s a sentence rather than 0.3 s, not 4x.
+- **Engine** — *Recognise → translate → speak* is the one to run on a Sunday. *Audio straight
+  into the model* is experimental: one model hears the sermon and writes the Chinese, with no
+  transcription step in between, which is worth about a quarter of a second a sentence and one
+  less model in memory. It needs a 64 GB+ Mac and the second environment from **Setup**;
+  `experiments/README.md` has the measurements and what had to be worked around to get a
+  conversational model to translate instead of answering.
 - **`glossary.txt`** — your ministry names and your elders' names. The single biggest quality
-  win available to you. The 66 Chinese book names (和合本) are already built into the prompt,
-  so only name a translation here if your church quotes a different one.
+  win available to you. On the cascade the 66 Chinese book names (和合本) are built into the
+  prompt, so only name a translation here if your church quotes a different one. The omni
+  engine has no such list — it does not need one, and including it made the model read the
+  list out loud instead of translating.
   `cp glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
   since it ends up full of real people's names. Keep it short — it is re-read on every
   utterance, so a long one costs latency on every sentence of the sermon.
 - **One direction at a time.** The console translates the sermon into one language. If you
   need English→Chinese and Chinese→English simultaneously, run a second copy of the repo on
   another port with the directions reversed, and hand out two QR codes.
-- **Engine** — *Recognise → translate → speak* is the one to run on a Sunday. *Audio straight
-  into the model* is experimental: one model hears the sermon and writes the Chinese, with no
-  transcription step in between, which is worth about a quarter of a second a sentence and one
-  less model in memory. It needs a 64 GB+ Mac and a one-time setup — see
-  `experiments/README.md` for the three commands and for what had to be worked around.
-- **Language model** — cascade only; the omni engine brings its own. 4B is the floor for sermon register. On a 24 GB+ Mac pick the 8B; the
-  difference is visible. On 64 GB+ pick Qwen3.6 35B-A3B, which is the only one that gets Bible
-  book names consistently right (see above). Watch for backlog warnings afterwards — a bigger
-  model is usually a slower one, though the 35B is a mixture-of-experts and costs far less
-  than its size suggests: 0.5 s a sentence against the 8B's 0.3 s.
-- **Context** — 2 sentences keeps pronouns and topic consistent without letting an hour of
-  sermon fill the context window. Drop to 0 if the model starts chatting back.
+- **Language model** — cascade only; the omni engine brings its own. 4B is the floor for
+  sermon register, 8B is visibly better on a 24 GB+ Mac, and on 64 GB+ the Qwen3.6 35B-A3B is
+  the one to pick. It is a mixture of experts with ~3B active, so it costs 0.5 s a sentence
+  against the 8B's 0.3 s rather than anything like its size. Watch for backlog warnings after
+  a change either way.
+
+  Bible book names are what separates them. The small models calque the English ordinal —
+  "Second John" becomes 第二封约翰书 instead of 约翰二书, and 4B renders a bare "John" as
+  约翰书 rather than 约翰福音. Scored on 72 spoken book references, greedy: 8B 58/72, 35B
+  68/72, and all four of the 35B's misses are it correctly naming the prophet rather than the
+  book. No prompt wording fixed the 8B — the variants that helped the numbered books broke
+  plain "John". The omni engine gets them right on its own, 6 of 7 including the numbered
+  ones, which is why it carries no book list.
+- **Context** — cascade only. 2 sentences keeps pronouns and topic consistent without letting
+  an hour of sermon fill the context window. Drop to 0 if the model starts chatting back. The
+  omni engine always runs at 0: given previous turns it starts answering the conversation
+  rather than translating it.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
 - **Voice** — Qwen3-TTS sounds best. If `!! backlog, dropping audio` keeps appearing and a
@@ -219,10 +244,12 @@ All of this lives in the console; the notes below are why each one is there.
 
 ## What this is not
 
-- **It lags 2–4 s.** Turn-based: nothing is translated until the preacher pauses, then STT +
-  LLM + TTS + the voice buffer + the phone's MP3 buffer all stack up. Fine for preaching,
-  useless for back-and-forth Q&A. Tell listeners to use headphones and not to expect
-  lip-sync. On a 15 s sample the first words came out 1 s after the first pause.
+- **It lags about a second, plus the phone.** Turn-based: nothing is translated until the
+  preacher pauses, then recognition, translation, the voice, and the voice buffer all stack
+  up. Measured on a recorded sermon from last speech to the first audio leaving the pipeline:
+  about 1 s on the cascade, 0.4–0.7 s on omni. The phone's own MP3 buffer adds more on top and
+  is not included in those numbers. Fine for preaching, useless for back-and-forth Q&A. Tell
+  listeners to use headphones and not to expect lip-sync.
 - **Subtitles arrive before the audio they narrate**, by a second or two — the text exists as
   soon as the LLM finishes, the voice has to be synthesised and buffered. Nothing lines them
   up; reading ahead of the voice is the intended behaviour, not a bug to fix.
@@ -237,15 +264,20 @@ All of this lives in the console; the notes below are why each one is there.
   out of six. Leave it at its default. Past 20 s of backlog `bridge.py` drops audio and resyncs
   to live, so a listener hears a gap rather than an ever-growing delay.
 - **It will mistranslate.** Local models get theology wrong in interesting ways, the small
-  ones spectacularly so. The 35B is the most reliable of the three and is still a local model.
-  Treat it as a hearing aid for visitors, not as the sermon of record.
+  ones spectacularly so. The 35B is the most reliable of the translators and is still a local
+  model. Treat it as a hearing aid for visitors, not as the sermon of record.
+- **The omni engine has never run a live service.** Everything claimed for it here was
+  measured against recorded audio. Each time it met something new it failed in a way nobody
+  would have predicted — holding a conversation, reading the Bible book list out loud, opening
+  every sentence with the word "assistant". Keep the cascade a click away.
 
 ## Where the models live
 
 The first run downloads about 6.6 GB into your home directory, not into the project folder,
 so deleting the repo reclaims none of it. Switching the translator in the console downloads
-that model too, the first time you select it: the 8B is 4.3 GB and the 35B is 35 GB, and
-neither replaces what is already there.
+that model too, the first time you select it: the 8B is 4.3 GB, the 35B is 35 GB and the omni
+engine's model is 36 GB, and none of them replaces what is already there. The omni model lands
+in the same cache even though it runs from `.venv-omni`.
 
 | | |
 |---|---|
@@ -266,6 +298,7 @@ hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
 # used Smart Turn; hf cache ls above shows which of these you actually have
 hf cache rm model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
+            model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit \
             model/pipecat-ai/smart-turn-v3
 
 hf cache prune                 # half-finished downloads
@@ -280,9 +313,11 @@ downloads them again and the console sits on "starting" until it finishes.
 
 ```bash
 python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out, config
-                         # validation, clean shutdown on TERM/HUP, console refuses the LAN
+                         # validation, clean shutdown on TERM/HUP, console refuses the LAN,
+                         # the mic watchdog, and the prompt and proxy the omni engine needs
 python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids, the
-                         # theme toggle always flips, and the console script runs (needs node)
+                         # theme toggle always flips, and the console script runs against both
+                         # engines (needs node)
 ```
 
 The pipeline itself has no self-check here: start it and read `sermon.log`, where every
