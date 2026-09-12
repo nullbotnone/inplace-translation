@@ -23,19 +23,20 @@
   }
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:
-       radial-gradient(circle at 50% -10rem,var(--glow),transparent 34rem),var(--bg);color:var(--ink);
+       radial-gradient(circle at 12% -5rem,var(--glow),transparent 30rem),
+       radial-gradient(circle at 88% 20rem,var(--glow),transparent 26rem),var(--bg);color:var(--ink);
        font:15px/1.6 system-ui,"PingFang SC","Noto Sans SC",sans-serif}
-  .wrap{max-width:74rem;margin:0 auto;padding:clamp(1rem,3vw,2rem)}
-  h1{margin:0;font-size:clamp(1.15rem,2vw,1.35rem);font-weight:720;letter-spacing:-.025em}
+  .wrap{max-width:80rem;margin:0 auto;padding:clamp(1rem,3vw,2.2rem)}
+  h1{margin:0;font-size:clamp(1.2rem,2vw,1.5rem);font-weight:760;letter-spacing:-.035em}
   h2{margin:0 0 1rem;font:750 .72rem/1.4 var(--mono);letter-spacing:.12em;
      text-transform:uppercase;color:var(--dim)}
-  header{display:flex;align-items:center;gap:.85rem;flex-wrap:wrap;padding:.2rem 0 1.15rem}
+  header{display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;padding:.2rem 0 1.25rem}
   .brand{display:flex;flex-direction:column;line-height:1.25}
   .brand p{margin:.15rem 0 0;color:var(--dim);font-size:.78rem}
   .actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-  .commandbar{position:sticky;top:0;z-index:10;margin-inline:clamp(-2rem,-3vw,-1rem);
-              padding:.75rem clamp(1rem,3vw,2rem);border-block:1px solid var(--line);
-              background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px)}
+  .commandbar{position:sticky;top:.65rem;z-index:10;padding:.7rem;border:1px solid var(--line-strong);
+              border-radius:14px;background:color-mix(in srgb,var(--surface) 90%,transparent);
+              box-shadow:0 12px 30px var(--shadow);backdrop-filter:blur(16px)}
   .actions-inline{margin-top:.7rem;gap:.5rem}
   /* A notice, not a continuation of the hint above it: two paragraphs of hint text running
      together read as one contradictory sentence. */
@@ -45,7 +46,8 @@
   [data-cascade-only].inert{opacity:.4}
   [data-cascade-only].inert select,[data-cascade-only].inert input{pointer-events:none}
   .grow{flex:1}
-  .mark{width:1.9rem;height:1.9rem;flex:0 0 auto;border-radius:.45rem;display:block}
+  .mark{width:2.15rem;height:2.15rem;flex:0 0 auto;border-radius:.55rem;display:block;
+        box-shadow:0 8px 20px var(--shadow)}
 
   .state{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .8rem;border-radius:999px;
          border:1px solid var(--line);font:750 .72rem/1.4 var(--mono);letter-spacing:.1em;
@@ -58,7 +60,17 @@
   .state[data-s=error]{color:var(--bad)}
   @keyframes pulse{50%{opacity:.3}}
 
-  button{font:inherit;font-size:.88rem;font-weight:650;padding:.55rem 1.1rem;border-radius:8px;
+  .readiness{display:grid;grid-template-columns:1.1fr 1.25fr 1.5fr .8fr;gap:0;
+             margin-top:1rem;border:1px solid var(--line);border-radius:14px;
+             background:color-mix(in srgb,var(--surface) 76%,transparent);overflow:hidden}
+  .signal{min-width:0;padding:.8rem 1rem;border-right:1px solid var(--line)}
+  .signal:last-child{border-right:0}
+  .signal-label{display:block;margin-bottom:.18rem;color:var(--dim);font:700 .66rem/1.3 var(--mono);
+                letter-spacing:.09em;text-transform:uppercase}
+  .signal-value{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                font-size:.86rem;font-weight:680}
+
+  button{min-height:2.55rem;font:inherit;font-size:.88rem;font-weight:680;padding:.55rem 1.1rem;border-radius:9px;
          border:1px solid var(--line-strong);background:transparent;color:var(--ink);cursor:pointer;
          transition:border-color .16s,color .16s,background .16s,transform .16s,filter .16s}
   button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
@@ -88,10 +100,12 @@
                                        box-shadow:inset -.32rem -.2rem 0 currentColor}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 
-  .cards{display:grid;gap:1rem;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:1.25rem}
+  .cards{display:grid;gap:1.1rem;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:1.1rem}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
-        padding:1.25rem;display:flex;flex-direction:column;grid-column:span 6;
-        box-shadow:0 12px 35px var(--shadow)}
+        padding:clamp(1.1rem,2vw,1.4rem);display:flex;flex-direction:column;grid-column:span 6;
+        box-shadow:0 12px 35px var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;
+                background:linear-gradient(90deg,var(--accent),transparent 55%);opacity:.55}
   .card.quality{grid-column:span 8}
   .card.listeners-card{grid-column:span 4}
   .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
@@ -102,7 +116,7 @@
   .card .hint:last-child{margin-top:auto;padding-top:.6rem}
   label span{display:block;margin-bottom:.3rem;font-size:.82rem;color:var(--dim)}
   select,input[type=number],textarea{width:100%;font:inherit;font-size:.88rem;color:var(--ink);
-    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.58rem .7rem;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:.64rem .75rem;
     outline:0;transition:border-color .16s,box-shadow .16s}
   select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible,.url:focus-visible{
     border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);outline:0}
@@ -112,7 +126,8 @@
   .hint{margin:0;font-size:.8rem;color:var(--dim)}
   .hint.warn{color:var(--warn)}
 
-  .meter{height:.5rem;border-radius:999px;background:var(--surface-2);overflow:hidden;margin:.5rem 0 .4rem}
+  .meter{height:.6rem;border-radius:999px;background:var(--surface-2);overflow:hidden;margin:.65rem 0 .45rem;
+         box-shadow:inset 0 0 0 1px var(--line)}
   .meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .1s linear}
   .meter i.hot{background:var(--bad)}
   .meter i.quiet{background:var(--dim)}
@@ -121,7 +136,8 @@
         margin-top:auto;padding-top:.8rem;font-size:.88rem}
   .stat span{color:var(--dim);font-family:var(--mono);font-size:.82rem}
 
-  #qr{display:grid;place-items:center;padding:.8rem;background:#fff;border-radius:10px}
+  #qr{display:grid;place-items:center;padding:1rem;background:#fff;border-radius:12px;
+      box-shadow:0 8px 26px var(--shadow)}
   #qr svg{display:block;width:100%;height:auto;max-width:11rem}
   .url{display:block;margin:.7rem 0 0;text-align:center;font:.82rem/1.5 var(--mono);
        overflow-wrap:anywhere;color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
@@ -146,8 +162,11 @@
          text-align:center;box-shadow:0 12px 35px var(--shadow);transition:.2s;pointer-events:none}
   .toast.show{opacity:1;transform:translate(-50%,0)}
   @media (max-width:40rem){
-    .wrap{padding:1rem}.commandbar{margin-inline:-1rem;padding-inline:1rem}
-    .commandbar .grow{display:none}.commandbar #detail{flex-basis:100%;margin:0}
+    .wrap{padding:1rem}.commandbar{top:.4rem}
+    .commandbar .grow{display:none}.commandbar #detail{flex-basis:100%;margin:0;padding:.1rem .25rem}
+    .commandbar button{flex:1;padding-inline:.7rem}
+    .readiness{grid-template-columns:1fr 1fr}.signal:nth-child(2){border-right:0}
+    .signal:nth-child(-n+2){border-bottom:1px solid var(--line)}
     .row{display:grid;grid-template-columns:1fr}.brand p{display:none}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -163,9 +182,6 @@
     <p data-zh="现场翻译运行与监听" data-tw="現場翻譯執行與監聽"
        data-en="Live translation control and monitoring"></p>
   </div>
-  <span class="state" id="state" data-s="stopped" role="status" aria-live="polite">
-    <i aria-hidden="true"></i><span id="statetext"></span>
-  </span>
   <span class="grow"></span>
   <!-- No data-* translation on this element: labels() writes textContent, which would
        replace these buttons with the label text. The sermon's languages are named in
@@ -183,11 +199,32 @@
 
 <div class="actions commandbar">
   <button class="primary" id="startbtn" data-zh="启动" data-tw="啟動" data-en="Start"></button>
-  <button id="stopbtn" data-zh="停止" data-tw="停止" data-en="Stop"></button>
   <button id="restartbtn" data-zh="重启" data-tw="重啟" data-en="Restart"></button>
+  <button id="stopbtn" data-zh="停止" data-tw="停止" data-en="Stop"></button>
   <span class="grow"></span>
   <p class="hint" id="detail"></p>
 </div>
+
+<section class="readiness" aria-label="Service readiness">
+  <div class="signal">
+    <span class="signal-label" data-zh="服务状态" data-tw="聚會狀態" data-en="Service status"></span>
+    <span class="state" id="state" data-s="stopped" role="status" aria-live="polite">
+      <i aria-hidden="true"></i><span id="statetext"></span>
+    </span>
+  </div>
+  <div class="signal">
+    <span class="signal-label" data-zh="翻译方向" data-tw="翻譯方向" data-en="Translation direction"></span>
+    <span class="signal-value" id="directionbrief">—</span>
+  </div>
+  <div class="signal">
+    <span class="signal-label" data-zh="麦克风检查" data-tw="麥克風檢查" data-en="Microphone check"></span>
+    <span class="signal-value" id="micbrief">—</span>
+  </div>
+  <div class="signal">
+    <span class="signal-label" data-zh="在线听众" data-tw="線上聽眾" data-en="Live listeners"></span>
+    <span class="signal-value" id="listenersbrief">0</span>
+  </div>
+</section>
 
 <div class="cards">
 
@@ -352,7 +389,7 @@ const STR = {
         copied:"听众链接已复制", copyfailed:"复制失败，请手动选取链接。", cleared:"字幕已清空",
         requestfailed:"操作失败，请检查控制台连接。", glossarycount:"{n} 个字符",
         restarting:"正在重启。模型加载约需一分钟。", restartneeded:"需要重启：刚才更改的设定要重启后才会生效。",
-        micprompt:"请对麦克风讲话，音量条应有反应。", micgood:"输入音量正常。",
+        micprompt:"请对麦克风讲话，音量条应有反应。", micgood:"输入音量正常。", micstandby:"启动后检查输入", micnone:"未检测到输入", micokbrief:"输入正常", micloud:"输入过大",
         micsilent:"未侦测到音频输入，请检查线路与所选设备。", micclip:"输入音量过载，请调低音控台的输出电平。",
         direction:"讲道语言为{a}，听众听到{b}。", samelang:"讲道语言与听众语言相同，不会进行翻译。",
         autolang:"讲员语言设为自动侦测。以{b}讲道的内容将不会翻译，听众端为静音。请指定讲道所用语言。",
@@ -362,7 +399,7 @@ const STR = {
         copied:"聽眾連結已複製", copyfailed:"複製失敗，請手動選取連結。", cleared:"字幕已清空",
         requestfailed:"操作失敗，請檢查控制台連線。", glossarycount:"{n} 個字元",
         restarting:"正在重啟。模型載入約需一分鐘。", restartneeded:"需要重啟：剛才更改的設定要重啟後才會生效。",
-        micprompt:"請對麥克風講話，音量條應有反應。", micgood:"輸入音量正常。",
+        micprompt:"請對麥克風講話，音量條應有反應。", micgood:"輸入音量正常。", micstandby:"啟動後檢查輸入", micnone:"未偵測到輸入", micokbrief:"輸入正常", micloud:"輸入過大",
         micsilent:"未偵測到音訊輸入，請檢查線路與所選裝置。", micclip:"輸入音量過載，請調低音控台的輸出電平。",
         direction:"講道語言為{a}，聽眾聽到{b}。", samelang:"講道語言與聽眾語言相同，不會進行翻譯。",
         autolang:"講員語言設為自動偵測。以{b}講道的內容將不會翻譯，聽眾端為靜音。請指定講道所用語言。",
@@ -373,7 +410,7 @@ const STR = {
         copied:"Listener link copied", copyfailed:"Copy failed. Select the link manually.", cleared:"Transcript cleared",
         requestfailed:"Request failed. Check the console connection.", glossarycount:"{n} characters",
         restartneeded:"Restart required — the setting you just changed takes effect after restarting.",
-        micprompt:"Speak into the microphone. The level meter should respond.", micgood:"Input level is normal.",
+        micprompt:"Speak into the microphone. The level meter should respond.", micgood:"Input level is normal.", micstandby:"Check after starting", micnone:"No input detected", micokbrief:"Input looks good", micloud:"Input too loud",
         micsilent:"No audio input detected. Check the cable and the selected device.",
         micclip:"Input is clipping. Reduce the send level at the mixing desk.",
         direction:"Preached in {a}; listeners hear {b}.", samelang:"Source and target languages are identical. Nothing will be translated.",
@@ -468,6 +505,7 @@ function paint() {
   if (!s) return;
 
   const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
+  $("directionbrief").textContent = `${from} → ${into}`;
   // Qwen3-Omni hears the audio itself: no recogniser to give a language to, no translator
   // model to choose, and it runs without history. Leaving those live invites the operator to
   // set something that does nothing.
@@ -490,6 +528,7 @@ function paint() {
 
   $("detail").textContent = s.detail || "";
   $("listeners").textContent = s.listeners;
+  $("listenersbrief").textContent = s.listeners;
   $("url").textContent = s.url;
   $("url").href = s.url || "";
   if (s.url && s.url !== qrUrl) {
@@ -502,8 +541,11 @@ function paint() {
 
   $("level").style.width = Math.min(100, s.level * 140) + "%";
   $("level").className = s.level > .92 ? "hot" : s.level < .02 ? "quiet" : "";
-  $("levelhint").textContent = s.state !== "running" ? t("micprompt")
+  const micState = s.state !== "running" ? t("micprompt")
     : s.level < .02 ? t("micsilent") : s.level > .92 ? t("micclip") : t("micgood");
+  $("levelhint").textContent = micState;
+  $("micbrief").textContent = s.state !== "running" ? t("micstandby")
+    : s.level < .02 ? t("micnone") : s.level > .92 ? t("micloud") : t("micokbrief");
 
   $("startbtn").disabled = linkLost || busyAction !== null || s.state === "running" || s.state === "starting";
   $("stopbtn").disabled = linkLost || busyAction !== null || s.state === "stopped";

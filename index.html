@@ -1,59 +1,137 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071013">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Sermon Translation / 讲道翻译</title>
 <style>
-  body{font:16px/1.6 system-ui;margin:0;height:100dvh;background:#111;color:#eee;
-       display:grid;grid-template-rows:auto 1fr auto;gap:.5rem}
-  header,footer{padding:.8rem;text-align:center}
-  header{border-bottom:1px solid #333;font-weight:600;
-         display:flex;align-items:center;justify-content:center;gap:.6rem}
-  .mark{width:1.6rem;height:1.6rem;flex:0 0 auto;border-radius:.4rem;display:block}
-  #log{overflow-y:auto;padding:0 1.2rem;display:flex;flex-direction:column;justify-content:flex-end}
-  #log p{margin:.2rem 0 1rem}
-  .out{font-size:1.4rem}
-  .src{font-size:.9rem;opacity:.45;margin-top:-.9rem}
-  button{font-size:1.3rem;padding:1rem 2.2rem;border-radius:999px;border:0;
-         background:#2d6cdf;color:#fff}
-  small{display:block;opacity:.5;margin-top:.6rem}
+  :root{color-scheme:dark;--bg:#071013;--surface:#0b181b;--surface-2:#112326;--ink:#f5efe2;
+    --dim:#a9aea4;--line:#e0d2ae24;--accent:#9fb8d4;--accent-2:#d7bd82;--ok:#91b9a8;
+    --bad:#d49a86;--shadow:#0008;--safe-bottom:max(1rem,env(safe-area-inset-bottom))}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink)}
+  body{min-height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+       font:16px/1.6 system-ui,"PingFang SC","Noto Sans SC",sans-serif;
+       background:radial-gradient(circle at 50% -8rem,#9fb8d414,transparent 28rem),var(--bg)}
+  button{font:inherit}.shell{width:min(100% - 2rem,54rem);margin-inline:auto}
+  header{border-bottom:1px solid var(--line);background:#071013d9;backdrop-filter:blur(16px)}
+  .topbar{min-height:4.35rem;display:flex;align-items:center;gap:.8rem}
+  .mark{width:2rem;height:2rem;flex:0 0 auto;border-radius:.5rem;display:block;box-shadow:0 8px 24px var(--shadow)}
+  .brand{min-width:0;line-height:1.2}.brand strong{display:block;font-size:.96rem;letter-spacing:-.01em}
+  .brand span{display:block;margin-top:.2rem;color:var(--dim);font-size:.72rem}
+  .connection{margin-left:auto;display:inline-flex;align-items:center;gap:.45rem;padding:.32rem .7rem;
+    border:1px solid var(--line);border-radius:999px;color:var(--dim);font-size:.72rem;font-weight:750;
+    letter-spacing:.06em;text-transform:uppercase}.connection i{width:.46rem;height:.46rem;border-radius:50%;background:currentColor}
+  .connection[data-state="live"]{color:var(--ok)}
+  .connection[data-state="live"] i{box-shadow:0 0 12px currentColor;animation:pulse 2s infinite}
+  .connection[data-state="offline"]{color:var(--bad)}
+  main{min-height:0;display:grid}
+  #log{min-height:0;margin:0;padding:clamp(2rem,6vw,4.5rem) 0 2rem;list-style:none;overflow-y:auto;
+       overscroll-behavior:contain;scrollbar-color:var(--line) transparent}
+  #log li{animation:arrive .28s ease-out}#log li+li{margin-top:clamp(1.5rem,4vw,2.4rem)}
+  .line-meta{display:flex;align-items:center;gap:.55rem;margin-bottom:.45rem;color:var(--dim);
+             font-size:.68rem;font-weight:760;letter-spacing:.09em;text-transform:uppercase}
+  .line-meta::before{content:"";width:1.2rem;height:1px;background:var(--accent)}
+  .out{margin:0;max-width:48rem;font-size:clamp(1.6rem,4.8vw,2.65rem);font-weight:690;
+       line-height:1.34;letter-spacing:-.025em;text-wrap:pretty}
+  .src{margin:0;max-width:44rem;color:var(--dim);font-size:clamp(.95rem,2.7vw,1.12rem);line-height:1.55;text-wrap:pretty}
+  .empty{align-self:center;min-height:100%;display:grid;place-items:center;text-align:center;color:var(--dim)}
+  .empty-inner{padding:2rem 1rem}.listening-mark{width:4rem;height:4rem;display:grid;place-items:center;
+    margin:0 auto 1.25rem;border:1px solid var(--line);border-radius:50%;background:var(--surface);
+    color:var(--accent);font-size:1.35rem;box-shadow:0 18px 50px #0004}
+  .empty strong{display:block;color:var(--ink);font-size:clamp(1.2rem,4vw,1.55rem)}
+  .empty p{margin:.5rem auto 0;max-width:28rem;font-size:.9rem}
+  footer{border-top:1px solid var(--line);background:color-mix(in srgb,var(--surface) 94%,transparent);
+         box-shadow:0 -18px 50px #0005;backdrop-filter:blur(18px)}
+  .controls{display:flex;align-items:center;gap:1rem;padding:1rem 0 var(--safe-bottom)}
+  #b{min-width:10.5rem;min-height:3.25rem;display:inline-flex;align-items:center;justify-content:center;
+     gap:.55rem;padding:.75rem 1.35rem;border:1px solid var(--accent);border-radius:999px;background:var(--accent);
+     color:#08151c;font-size:1rem;font-weight:780;cursor:pointer;box-shadow:0 10px 30px #0005;
+     transition:transform .16s,filter .16s}#b:hover{filter:brightness(1.08)}#b:active{transform:translateY(1px)}
+  #b:focus-visible{outline:3px solid #9fb8d438;outline-offset:3px}
+  #b[data-mode="playing"] .play-icon::before{content:"Ⅱ";font-size:.82rem;letter-spacing:-.1em}
+  #b[data-mode="loading"]{cursor:progress}#b[data-mode="loading"] .play-icon{width:1rem;height:1rem;
+    border:2px solid #08151c55;border-top-color:#08151c;border-radius:50%;animation:spin .75s linear infinite}
+  #b[data-mode="loading"] .play-icon::before{content:""}.play-icon::before{content:"▶";font-size:.9rem}
+  .help{min-width:0}.help strong{display:block;font-size:.85rem}.help span{display:block;margin-top:.15rem;
+    color:var(--dim);font-size:.75rem;line-height:1.45}.headphones{margin-left:auto;color:var(--accent-2);
+    font-size:.78rem;font-weight:720;white-space:nowrap}audio{display:none}
+  @keyframes pulse{50%{opacity:.4}}@keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes arrive{from{opacity:0;transform:translateY(.5rem)}}
+  @media (max-width:38rem){.shell{width:min(100% - 1.25rem,54rem)}.brand span{display:none}
+    .connection{padding-inline:.55rem}#log{padding-top:2rem}.controls{display:grid;grid-template-columns:1fr auto;gap:.7rem .8rem}
+    #b{grid-column:1/-1;width:100%}.help span{font-size:.7rem}.headphones{align-self:start}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<header><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#071013"/><path d="M6 10a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v7a4 4 0 0 1-4 4h-8l-5 5v-5h-1a2 2 0 0 1-2-2z" fill="#f1eadb"/><rect x="10" y="10" width="12" height="2.6" rx="1.3" fill="#071013"/><rect x="10" y="14.8" width="7.5" height="2.6" rx="1.3" fill="#8fa7c2"/></svg><span>Sermon Translation · 讲道翻译</span></header>
-<div id="log"></div>
-<footer>
-  <button id="b">▶ Listen / 收听</button>
-  <small>Subtitles run a few seconds behind the speaker, audio a little behind those.<br>
-         字幕比讲员慢几秒，语音再慢一点。Headphones please / 请戴耳机。</small>
-</footer>
-<audio id="a"></audio>
+</head>
+<body>
+<header><div class="shell topbar">
+  <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#071013"/><path d="M6 10a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v7a4 4 0 0 1-4 4h-8l-5 5v-5h-1a2 2 0 0 1-2-2z" fill="#f1eadb"/><rect x="10" y="10" width="12" height="2.6" rx="1.3" fill="#071013"/><rect x="10" y="14.8" width="7.5" height="2.6" rx="1.3" fill="#8fa7c2"/></svg>
+  <div class="brand"><strong>Sermon Translation · 讲道翻译</strong><span>Live interpretation · 现场翻译</span></div>
+  <span class="connection" id="connection" data-state="connecting" role="status" aria-live="polite"><i aria-hidden="true"></i><span id="connectionText">Connecting · 连接中</span></span>
+</div></header>
+<main class="shell"><ol id="log" role="log" aria-live="polite" aria-relevant="additions">
+  <li class="empty"><div class="empty-inner"><span class="listening-mark" aria-hidden="true">◌</span>
+    <strong>Waiting for the sermon · 等待讲道</strong><p>Live subtitles will appear here automatically.<br>现场字幕会自动显示在这里。</p>
+  </div></li>
+</ol></main>
+<footer><div class="shell controls">
+  <button id="b" type="button" data-mode="idle" aria-pressed="false"><span class="play-icon" aria-hidden="true"></span><span id="buttonText">Listen live · 收听直播</span></button>
+  <div class="help"><strong id="playHint">Audio is off · 音频尚未开启</strong><span>Subtitles arrive first; audio follows a little later.<br>字幕先到，语音会稍后播放。</span></div>
+  <span class="headphones">🎧 Headphones · 请戴耳机</span>
+</div></footer>
+<audio id="a" preload="none"></audio>
 <script>
+  const $ = (id) => document.getElementById(id);
+  const audio = $("a"), button = $("b"), log = $("log");
+  let wantsAudio = false, retry = null;
+  const seenLines = new Set(), seenOrder = [];
+  const playback = (mode, label, hint) => {
+    button.dataset.mode = mode; button.setAttribute("aria-pressed", String(mode === "playing"));
+    $("buttonText").textContent = label; $("playHint").textContent = hint;
+  };
   const listen = () => {
-    a.src = "/stream.mp3?" + Date.now();   // always join live, never a stale buffer
-    return a.play();
+    wantsAudio = true; playback("loading", "Joining live audio · 正在连接", "Connecting to the live stream · 正在连接直播");
+    audio.src = "/stream.mp3?" + Date.now(); return audio.play();
   };
-  b.onclick = () => listen().then(() => b.textContent = "🔊 Playing / 收听中")
-                            .catch(e => b.textContent = e.message);
-
-  // The stream ends on any wifi hiccup, and the server drops a listener whose phone falls
-  // behind. Nothing in <audio> retries, so without this the phone goes quiet for the rest
-  // of the sermon while the subtitles keep scrolling.
-  let retry = null;
-  ["ended", "error"].forEach((e) => a.addEventListener(e, () => {
-    if (!a.src || retry) return;
-    b.textContent = "… reconnecting / 重新连接";
-    retry = setTimeout(() => {
-      retry = null;
-      listen().then(() => b.textContent = "🔊 Playing / 收听中").catch(() => {});
-    }, 1000);
+  button.onclick = () => {
+    if (wantsAudio && !audio.paused) {
+      wantsAudio = false; clearTimeout(retry); retry = null; audio.pause();
+      playback("idle", "Resume live · 继续收听", "Audio paused · 音频已暂停"); return;
+    }
+    listen().catch(() => { wantsAudio = false;
+      playback("error", "Try audio again · 重试音频", "Audio could not start · 音频无法播放"); });
+  };
+  audio.addEventListener("playing", () => playback("playing", "Pause audio · 暂停语音", "Playing live audio · 正在播放直播语音"));
+  audio.addEventListener("waiting", () => { if (wantsAudio)
+    playback("loading", "Buffering · 正在缓冲", "Keeping the live audio smooth · 正在缓冲语音"); });
+  ["ended", "error"].forEach((name) => audio.addEventListener(name, () => {
+    if (!wantsAudio || retry) return;
+    playback("loading", "Reconnecting · 正在重连", "The audio stream was interrupted · 语音连接已中断");
+    retry = setTimeout(() => { retry = null; listen().catch(() => { wantsAudio = false;
+      playback("error", "Try audio again · 重试音频", "Audio is unavailable · 暂时无法播放语音"); }); }, 1000);
   }));
-
-  const es = new EventSource("/subs");
-  es.onopen = () => log.innerHTML = "";    // reconnect replays the backlog, so start clean
-  es.onmessage = e => {
-    const {kind, text} = JSON.parse(e.data);
-    log.insertAdjacentHTML("beforeend",
-      `<p class="${kind}">${text.replace(/[<&]/g, c => c == "<" ? "&lt;" : "&amp;")}</p>`);
-    while (log.children.length > 40) log.firstChild.remove();
-    log.scrollTop = log.scrollHeight;
+  const connection = (state, text) => { $("connection").dataset.state = state; $("connectionText").textContent = text; };
+  const addLine = ({ kind, text, at }) => {
+    log.querySelector(".empty")?.remove();
+    const item = document.createElement("li"), meta = document.createElement("div"), body = document.createElement("p");
+    meta.className = "line-meta"; meta.textContent = `${at || "Live"} · ${kind === "src" ? "Heard / 原文" : "Translation / 翻译"}`;
+    body.className = kind === "src" ? "src" : "out"; body.textContent = text; item.append(meta, body); log.appendChild(item);
+    while (log.children.length > 40) log.firstChild.remove(); log.scrollTop = log.scrollHeight;
   };
+  const es = new EventSource("/subs");
+  es.onopen = () => connection("live", "Live · 已连接");
+  es.onerror = () => connection("offline", "Reconnecting · 重新连接中");
+  es.onmessage = (event) => { try {
+      const line = JSON.parse(event.data);
+      const signature = JSON.stringify([line.kind, line.text, line.at]);
+      if (seenLines.has(signature)) return; // reconnects replay the server's recent backlog
+      seenLines.add(signature); seenOrder.push(signature);
+      if (seenOrder.length > 80) seenLines.delete(seenOrder.shift());
+      addLine(line);
+    } catch (error) { console.error("Bad subtitle event", error); } };
 </script>
+</body>
+</html>

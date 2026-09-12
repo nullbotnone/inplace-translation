@@ -135,8 +135,11 @@ if shutil.which("node"):
     r = subprocess.run(["node", str(HERE / "check_console.js")], capture_output=True, text=True)
     assert r.returncode == 0, "check_console.js: " + (r.stderr.strip() or r.stdout.strip())
     print(r.stdout.strip())
+    r = subprocess.run(["node", str(HERE / "check_listener.js")], capture_output=True, text=True)
+    assert r.returncode == 0, "check_listener.js: " + (r.stderr.strip() or r.stdout.strip())
+    print(r.stdout.strip())
 else:
-    print("note: node not found, skipped the console runtime check")
+    print("note: node not found, skipped the page runtime checks")
 
 # the served copy and the site's copy are the same mark; nothing keeps them in step but this
 assert (HERE / "favicon.svg").read_bytes() == (HERE / "docs" / "favicon.svg").read_bytes(), \
