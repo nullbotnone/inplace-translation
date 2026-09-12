@@ -15,7 +15,11 @@ HERE = Path(__file__).resolve().parent
 S2S_PORT, HTTP_PORT = 8765, 8000
 RATE, BLOCK = 16000, 320          # 20 ms of s16le mono
 MAX_LAG_S = 20                    # translation backlog before we start dropping
-MAX_QUEUED = 60                   # mp3 chunks buffered per listener (~10 s) before eviction
+BITRATE = 48000                   # mp3 bits per second
+MP3_CHUNK = 256                   # one mp3 frame at this bitrate and rate, in bytes. Reading
+                                  # 1024 held four frames back: 303 ms before the first byte
+                                  # left the encoder, against 124 ms a frame at a time.
+MAX_QUEUED = 10 * BITRATE // 8 // MP3_CHUNK   # ~10 s buffered per listener before eviction
 LOAD_TIMEOUT_S = 900              # first run downloads ~6.6 GB before the port answers
 
 CONFIG_PATH = HERE / "config.json"
@@ -496,7 +500,7 @@ def pacer(stdin, stop=None):
 
 
 def fanout(stdout):
-    while chunk := stdout.read(1024):
+    while chunk := stdout.read(MP3_CHUNK):
         audio.publish(chunk)
     broadcast_died("the audio encoder stopped producing output")
 
@@ -649,7 +653,11 @@ def main():
 
     ff = subprocess.Popen(
         ["ffmpeg", "-loglevel", "error", "-f", "s16le", "-ar", str(RATE), "-ac", "1",
-         "-i", "pipe:0", "-c:a", "libmp3lame", "-b:a", "48k", "-f", "mp3", "pipe:1"],
+         # The bit reservoir lets a frame borrow space from later ones, so the encoder sits
+         # on finished audio waiting to see what comes next. Worth it for music, not for a
+         # live voice: it held back a third of a second of speech, permanently.
+         "-i", "pipe:0", "-c:a", "libmp3lame", "-b:a", f"{BITRATE // 1000}k", "-reservoir", "0",
+         "-f", "mp3", "pipe:1"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     for fn, a in ((pacer, (ff.stdin,)), (fanout, (ff.stdout,)), (heartbeat, ())):
         threading.Thread(target=fn, args=a, daemon=True).start()

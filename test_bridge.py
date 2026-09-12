@@ -71,6 +71,11 @@ for _ in range(int(bridge.MAX_LAG_S * bridge.RATE * 2 / 640) + 10):
 run_pacer(0.1)
 assert bridge.out_q.qsize() < 10, f"backlog not dropped: {bridge.out_q.qsize()}"
 
+# eviction is counted in chunks but meant in seconds, so the two have to stay tied together:
+# shrinking the chunk for latency quietly shrank every listener's buffer by the same factor
+held_s = bridge.MAX_QUEUED * bridge.MP3_CHUNK * 8 / bridge.BITRATE
+assert 8 < held_s < 12, f"a listener may only buffer {held_s:.1f}s before being dropped"
+
 # a listener that stops draining is evicted instead of growing without bound
 f = bridge.Fanout(maxq=3)
 with f.subscribe() as fast, f.subscribe() as slow:
