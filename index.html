@@ -38,6 +38,13 @@
   .out{margin:0;max-width:48rem;font-size:clamp(1.6rem,4.8vw,2.65rem);font-weight:690;
        line-height:1.34;letter-spacing:-.025em;text-wrap:pretty}
   .src{margin:0;max-width:44rem;color:var(--dim);font-size:clamp(.95rem,2.7vw,1.12rem);line-height:1.55;text-wrap:pretty}
+  /* between a heard line and the translation it is waiting for */
+  .awaiting{display:flex;align-items:center;gap:.42rem;color:var(--dim);font-size:.68rem;
+            font-weight:760;letter-spacing:.09em;text-transform:uppercase}
+  .awaiting i{width:.4rem;height:.4rem;border-radius:50%;background:var(--accent);
+              animation:waiting 1.3s ease-in-out infinite}
+  .awaiting i:nth-of-type(2){animation-delay:.16s}.awaiting i:nth-of-type(3){animation-delay:.32s}
+  .awaiting span{margin-left:.35rem}
   .empty{align-self:center;min-height:100%;display:grid;place-items:center;text-align:center;color:var(--dim)}
   .empty-inner{padding:2rem 1rem}.listening-mark{width:4rem;height:4rem;display:grid;place-items:center;
     margin:0 auto 1.25rem;border:1px solid var(--line);border-radius:50%;background:var(--surface);
@@ -61,6 +68,7 @@
     font-size:.78rem;font-weight:720;white-space:nowrap}audio{display:none}
   @keyframes pulse{50%{opacity:.4}}@keyframes spin{to{transform:rotate(360deg)}}
   @keyframes arrive{from{opacity:0;transform:translateY(.5rem)}}
+  @keyframes waiting{0%,65%,100%{opacity:.22}30%{opacity:.95}}
   @media (max-width:38rem){.shell{width:min(100% - 1.25rem,54rem)}.brand span{display:none}
     .brand strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
     main{padding-bottom:8.5rem}.connection{padding-inline:.55rem;font-size:.66rem;letter-spacing:.03em}#log{padding-block:1.25rem}
@@ -187,9 +195,31 @@
   // and again with more of the sentence in it. The bridge gives every turn an id; a line
   // whose id is already on screen revises what is there rather than repeating it.
   const onScreen = new Map();
+  // The translation of a line is held back until the voice reaches it, which on a phone with
+  // a full buffer is a few seconds of a screen that looks like it has stopped working. Three
+  // dots under the heard line, for exactly as long as there is a translation still to come.
+  const waitingLine = document.createElement("li");
+  waitingLine.className = "awaiting";
+  waitingLine.setAttribute("aria-hidden", "true");     // the log announces itself; dots do not
+  for (let dot = 0; dot < 3; dot++) waitingLine.appendChild(document.createElement("i"));
+  const waitingLabel = document.createElement("span");
+  waitingLabel.textContent = "Translating · 正在翻译";
+  waitingLine.appendChild(waitingLabel);
+  // Shown while the newest line on screen is one that was heard, which is the whole of the
+  // question the dots answer. Counting what is outstanding instead would leave them spinning
+  // for the rest of the service after one utterance the translator answered with nothing --
+  // which is what it is told to do when the preacher is already speaking the listeners'
+  // language.
+  let awaiting = false;
+  const showWaiting = () => {
+    if (awaiting) log.appendChild(waitingLine);        // appendChild moves it to the end
+    else waitingLine.remove();
+    log.scrollTop = log.scrollHeight;
+  };
   const addLine = ({ kind, text, at, secs, id }) => {
     const showing = onScreen.get(id);
     if (showing) { showing.textContent = text; log.scrollTop = log.scrollHeight; return; }
+    awaiting = kind === "src";
     log.querySelector(".empty")?.remove();
     const safeKind = kind === "src" ? "src" : "out";
     const item = document.createElement("li"), meta = document.createElement("div"), body = document.createElement("p");
@@ -200,7 +230,9 @@
     if (spoken) revealOver(body, text, secs); else body.textContent = text;
     item.append(meta, body); log.appendChild(item);
     if (id !== undefined) onScreen.set(id, body);
+    waitingLine.remove();             // the cap counts lines of sermon, not the dots
     while (log.children.length > 40) { onScreen.delete(log.firstChild.lineId); log.firstChild.remove(); }
+    showWaiting();                    // ... which go back under the newest line
     log.scrollTop = log.scrollHeight; // every new line returns listeners to the live edge
   };
   // The bridge publishes a line as its own audio starts down the wire, but this phone plays

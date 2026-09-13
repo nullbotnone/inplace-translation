@@ -24,9 +24,13 @@ function el(tag = "div") {
     appendChild(c) { c.parent = this; this.children.push(c); return c; },
     append(...c) { c.forEach((x) => { x.parent = this; }); this.children.push(...c); },
     querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    // A node that is not in the tree removes to nothing, the way the DOM does; splicing at
+    // an index of -1 would take the last child with it instead.
     remove() {
       const kids = this.parent && this.parent.children;
-      if (kids) kids.splice(kids.indexOf(this), 1);
+      const at = kids ? kids.indexOf(this) : -1;
+      if (at >= 0) kids.splice(at, 1);
+      this.parent = null;
     },
     focus() {}, setSelectionRange() {}, addEventListener() {},
     replaceChildren(...kids) { e.children = kids; kids.forEach((k) => (k.parent = e)); },

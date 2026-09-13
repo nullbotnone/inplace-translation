@@ -17,9 +17,12 @@ function el(tag = "div") {
     emit(name) { listeners[name]?.(); },
     append(...kids) { kids.forEach((kid) => (kid.parent = this)); this.children.push(...kids); },
     appendChild(kid) { kid.parent = this; this.children.push(kid); return kid; },
+    // A node that is not in the tree removes to nothing, the way the DOM does; splicing at
+    // an index of -1 would take the last child with it instead.
     remove() {
-      if (!this.parent) return;
-      this.parent.children.splice(this.parent.children.indexOf(this), 1);
+      const at = this.parent ? this.parent.children.indexOf(this) : -1;
+      if (at >= 0) this.parent.children.splice(at, 1);
+      this.parent = null;
     },
     querySelector(sel) {
       if (sel === ".empty") return this.children.find((kid) => kid.className === "empty") ?? null;
@@ -51,20 +54,24 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(script, sandbox, { filename: "index.html" });
 
+// the waiting dots are furniture, not a line of sermon
+const lines = () => ids.log.children.filter((c) => c.className !== "awaiting");
+const dots = () => ids.log.children.find((c) => c.className === "awaiting");
+
 eventSource.onopen();
 if (ids.connection.dataset.state !== "live") throw new Error("connection state never became live");
 
 const line = JSON.stringify({ kind: "out", text: "<b>神爱世人</b>", at: "10:31:02" });
 eventSource.onmessage({ data: line });
 eventSource.onmessage({ data: line }); // the server replays recent lines after reconnects
-if (ids.log.children.length !== 1) throw new Error("a replayed subtitle was duplicated");
-if (ids.log.children[0].children[1].textContent !== "<b>神爱世人</b>")
+if (lines().length !== 1) throw new Error("a replayed subtitle was duplicated");
+if (lines()[0].children[1].textContent !== "<b>神爱世人</b>")
   throw new Error("subtitle text was not rendered safely");
 
 for (let i = 0; i < 60; i++)
   eventSource.onmessage({ data: JSON.stringify({ kind: i % 2 ? "src" : "out", text: `line ${i}`, at: `10:32:${i}` }) });
-if (ids.log.children.length !== 40) throw new Error(`expected bounded transcript history, got ${ids.log.children.length}`);
-if (ids.log.children.at(-1).children[1].textContent !== "line 59")
+if (lines().length !== 40) throw new Error(`expected bounded transcript history, got ${lines().length}`);
+if (lines().at(-1).children[1].textContent !== "line 59")
   throw new Error("the latest transcript line was not retained");
 if (ids.log.scrollTop !== ids.log.scrollHeight)
   throw new Error("the transcript did not return to the live edge");
@@ -77,7 +84,7 @@ ids.b.onclick();
 if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could not be paused");
 
 const tick = () => ticks.forEach((fn) => fn && fn());   // every interval the page set
-const latest = () => ids.log.children.at(-1).children[1].textContent;   // the transcript is capped
+const latest = () => lines().at(-1).children[1].textContent;   // the transcript is capped
 const say = (kind, text, secs) =>
   eventSource.onmessage({ data: JSON.stringify({ kind, text, at: "10:41:00", secs }) });
 
@@ -119,7 +126,7 @@ if (latest() !== "first line of the sermon") throw new Error("never shown once p
 
 // Whisper re-transcribes a turn as the speaker keeps going, correcting earlier words on the
 // way. Each pass carries the same id, and revises the line already on screen.
-const nthLast = (n) => ids.log.children.at(-n).children[1].textContent;  // the log is capped
+const nthLast = (n) => lines().at(-n).children[1].textContent;  // the log is capped
 eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "死亡的原因", at: "10:41:00", id: 77 }) });
 eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "死亡的原因是什么呢", at: "10:41:00", id: 77 }) });
 if (nthLast(1) !== "死亡的原因是什么呢") throw new Error(`the line was not revised: ${nthLast(1)}`);
@@ -128,13 +135,34 @@ eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "我们翻到�
 if (nthLast(1) !== "我们翻到第二章" || nthLast(2) !== "死亡的原因是什么呢")
   throw new Error("a new turn did not start its own line");
 
+// A translation is held until the voice reaches it, so the screen would otherwise sit there
+// looking broken. Three dots under the heard line, until its translation arrives.
+eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "等待翻译", at: "10:41:10", id: 80 }) });
+if (!dots()) throw new Error("nothing showed that a translation was still coming");
+if (ids.log.children.at(-1).className !== "awaiting") throw new Error("the dots are not under the newest line");
+eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "等待翻译的下一段", at: "10:41:10", id: 80 }) });
+if (ids.log.children.filter((c) => c.className === "awaiting").length !== 1)
+  throw new Error("a re-transcription added a second set of dots");
+eventSource.onmessage({ data: JSON.stringify({ kind: "out", text: "Waiting for this", at: "10:41:12", id: 81 }) });
+if (!dots()) throw new Error("the dots left before the translation was on screen");
+tick();                                    // ... the voice reaches it and the line appears
+if (dots()) throw new Error("the dots outlived the translation they were waiting for");
+if (latest() !== "Waiting for this") throw new Error("the translation never appeared");
+// ... and a turn the translator answers with nothing does not leave them spinning: the next
+// translation clears them, whatever went untranslated before it
+eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "未翻译的一句", at: "10:41:13", id: 82 }) });
+eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "下一句", at: "10:41:14", id: 83 }) });
+eventSource.onmessage({ data: JSON.stringify({ kind: "out", text: "The next one", at: "10:41:15", id: 84 }) });
+tick();
+if (dots()) throw new Error("an untranslated turn left the dots spinning");
+
 // A line is revealed as the voice says it, on the voice's own clock: this page plays 6%
 // fast while it catches up to the live edge and stops dead while a phone rebuffers, and the
 // words have to do both with it. Chinese counts by the character, English by the word.
 ids.a.currentTime = 100; ids.a.buffered = buffered(0, 100);
 say("out", "神爱世人", 4);
 tick();
-const body = ids.log.children.at(-1).children[1];
+const body = lines().at(-1).children[1];
 if (body.textContent !== "神") throw new Error(`expected the first character only, got ${body.textContent}`);
 ids.a.currentTime = 102; tick();          // half spoken
 if (body.textContent !== "神爱世") throw new Error(`at half the sentence: ${body.textContent}`);
@@ -148,7 +176,7 @@ ids.a.currentTime = 999; tick();          // finished lines stop costing anythin
 ids.a.buffered = buffered(0, 999);
 say("out", "Grace and peace", 3);
 tick();
-const english = ids.log.children.at(-1).children[1];
+const english = lines().at(-1).children[1];
 if (english.textContent !== "Grace") throw new Error(`expected one word, got ${english.textContent}`);
 ids.a.currentTime = 1002; tick();
 if (english.textContent !== "Grace and peace") throw new Error("the English line never completed");

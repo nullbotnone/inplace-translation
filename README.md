@@ -314,6 +314,13 @@ All of this lives in the console; the notes below are why each one is there.
   sentence would fill the transcript four times over. Passes that are recognisably the same
   turn carry one id, and the screen revises the line it is already showing.
 
+  Between the two, three dots pulse under the heard line: its translation is waiting for the
+  voice to reach it, which on a phone with a full buffer is a few seconds of a screen that
+  would otherwise look like it had stopped working. They show whenever the newest line is one
+  that was heard, so a sentence the translator answers with nothing — what it is told to do
+  when the preacher is already speaking the listeners' language — cannot leave them spinning
+  for the rest of the service.
+
   The phone then holds each line until its own playback reaches the point in the audio where
   that line is spoken — the end of what it holds when the line arrives, which is a position
   in its own timeline rather than a delay on a clock, so a rebuffer, the catch-up, and the
