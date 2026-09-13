@@ -1,0 +1,446 @@
+# In-place Translation: technical and operations guide
+
+For the short installation and Sunday-morning workflow, start with the
+[README](README.md). This guide keeps the implementation notes, tuning advice,
+benchmarks, troubleshooting, unattended operation, model storage, and test details.
+
+One laptop listens to the preacher, translates EN↔ZH locally, and broadcasts the
+translated voice as an MP3 stream with live subtitles. Phones join by scanning a QR code —
+no app, just a browser tab. Nothing leaves the building.
+
+```
+                   ┌─▶ ffmpeg ─▶ /stream.mp3 ─┐
+mic ─▶ bridge.py ──┼─▶ /subs (subtitles) ─────┴─▶ phones on the church wifi
+       │           └─▶ /admin ──────────────────▶ you, on this Mac only
+       │
+       └─ spawns: run_pipeline.py (speech-to-speech serve)
+                    cascade:  VAD → Whisper → translator → Kokoro
+                    omni:     VAD → Qwen3-Omni ─────────→ Kokoro
+```
+
+`bridge.py` starts the pipeline, so there is one thing to run and one page to drive it.
+
+Both streams come off the same pipeline: the audio deltas become the MP3, the transcripts
+become the subtitles. Listeners can use either — audio on headphones, or text only, which
+also covers deaf members and anyone the TTS voice doesn't work for.
+
+`speech-to-speech` is a *conversational* agent: VAD cuts the speech into turns, the LLM
+"replies", TTS speaks the reply. We keep all of that and only change the system prompt so
+the "reply" is a translation. `bridge.py` adds the part it has no concept of: one speaker,
+many listeners.
+
+The **omni** engine is the same pipeline with the recogniser removed: the turn's audio goes
+straight into a model that hears, and the translation comes back as text for the same voice to
+speak. It is opt-in and experimental — `experiments/README.md` has the measurements and the
+three things that had to be worked around, including the small proxy `bridge.py` serves at
+`/omni/v1` to make the pipeline and the audio model agree on where instructions go.
+
+## Hardware
+
+Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
+
+| | |
+|---|---|
+| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Kokoro is the default stack; its models download at ~4 GB, plus runtime caches |
+| Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
+| Book names right | **64 GB+**, which buys the 35 B translator — the only one that gets 约翰二书 right — and the optional omni engine |
+| Disk | ~6 GB: 4 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 37.7 GB, and the omni engine another 38.8 GB |
+
+Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
+MLX inference; on battery the Mac throttles and the translation falls behind.
+
+**Feed it line audio, not the built-in mic.** A USB interface taken off the sound desk's
+aux/monitor out beats every model upgrade on this page. Room mics pick up the congregation,
+the HVAC, and the PA's own output, and Whisper transcribes all of it.
+
+## Setup
+
+```bash
+brew install ffmpeg python@3.12
+cd ~                                    # not Documents, Desktop or Downloads — see below
+git clone https://github.com/nullbotnone/inplace-translation
+cd inplace-translation
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install speech-to-speech 'misaki[zh]' segno piper-tts   # misaki[zh] is Kokoro's
+                                                  # Chinese voices, piper-tts is the CPU
+                                                  # voice engine; segno draws the QR code
+```
+
+The omni engine is optional and needs a second environment, because `mlx-vlm` pulls a newer
+mlx than the pipeline is pinned to. Skip this unless you want it:
+
+```bash
+python3 -m venv .venv-omni
+.venv-omni/bin/pip install mlx-vlm
+.venv-omni/bin/hf download mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit   # 38.8 GB
+```
+
+**Prefer somewhere outside Documents, Desktop and Downloads.** macOS protects those three
+folders, so the first run there triggers a permission prompt for Terminal that somebody has to
+approve. Anywhere else in your home folder needs no permissions at all.
+
+To move an existing checkout, move the folder and rebuild the environment, since a virtualenv
+hard-codes its own path:
+
+```bash
+mv ~/Documents/inplace-translation ~/inplace-translation && cd ~/inplace-translation
+rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate
+pip install speech-to-speech 'misaki[zh]' segno piper-tts   # quick: wheels are cached
+```
+
+Approving the Terminal prompt works just as well; moving the folder simply means there is no
+prompt to explain to whoever runs it next.
+
+**Use Python 3.12, not whatever `python3` points at.** `misaki`, which Kokoro's text
+processing pulls in, publishes nothing for 3.13 or newer. On a 3.13+ venv pip cannot resolve
+it, backtracks through every `speech-to-speech` release looking for one that does not need it,
+and finally prints a `ResolutionImpossible` wall of text that names fourteen versions and
+never says the word "Python". The one line that matters in it is:
+
+```
+Additionally, some packages in these conflicts have no matching distributions
+available for your environment:
+    misaki
+```
+
+If you hit that, `rm -rf .venv` and rebuild it with `python3.12`. `start.sh` checks the
+version at startup so it cannot bite you twice.
+
+**One pipeline at a time.** The bridge starts `run_pipeline.py` only if nothing is already
+listening on port 8765, and otherwise attaches to what is there — which is what lets you
+restart the bridge without waiting for the models to load again. The cost is that a stray
+pipeline from another window is the one your sermon goes through, whatever it was configured
+for. If that copy exits, the bridge now says `[error] the pipeline closed the connection`
+rather than sitting there claiming to translate.
+
+macOS will ask Terminal for microphone permission the first time `bridge.py` runs. If the
+prompt never appears, grant it by hand in System Settings → Privacy & Security → Microphone.
+
+## Run
+
+**Double-click `Start Translation.command` in Finder.** A Terminal window opens, everything
+starts, and the console appears in your browser on its own. Leave the window open; closing it
+stops the translation and frees the memory the models were holding. Nobody needs to type
+anything.
+
+macOS will ask for the microphone the first time, and for folder access if the project sits
+somewhere protected. Both prompts come from Terminal, which can actually display them — an
+app bundle cannot, which is why this is a `.command` and not a `.app`.
+
+If the project arrived as a downloaded zip rather than a `git clone`, macOS may refuse it with
+*"cannot be opened because it is from an unidentified developer"*. Right-click the file once
+and choose **Open**, and it will not ask again.
+
+From a terminal, the same thing:
+
+```bash
+./start.sh
+```
+
+That is the whole thing. It launches the pipeline, waits for the models to load, starts the
+broadcast, and prints the listener URL and a QR code. Then open the console:
+
+**http://localhost:8000/admin**
+
+The console is where everything gets configured, so you should rarely need this guide again.
+It reads 简 / 繁 / EN and has a day/night toggle in the corner, both remembered between
+sessions:
+
+- **Sermon languages** — what the preacher speaks, and what listeners hear. These are not the
+  简/繁/EN switcher in the corner, which only changes the console's own wording. The spoken
+  language sets what the recogniser listens for and needs a restart; the listeners' language
+  only rewrites the prompt, so it takes effect on the next sentence. Pick **Detect
+  automatically** only if the preacher genuinely switches mid-sermon — naming the language
+  outright gets better recognition on names and short phrases. Detection is limited to these
+  two languages, so Mandarin that the recogniser would otherwise have called Japanese still
+  comes through as Chinese. Room noise between sentences is thrown away rather than
+  translated: handed a cough or the PA's hum, the recogniser returns one word looped to fill
+  the clip ("wires, wires, wires, ..."), and the bridge drops it with `!! dropped a looping
+  transcription` rather than speaking it over the sermon.
+  There is no 简体/繁體 choice, because listeners are hearing audio and the distinction only
+  exists in writing. It shows up in the subtitles, so a congregation that reads Traditional
+  asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*
+- **Microphone** — pick the input from a list, and watch the level meter while someone talks
+  into it. This is the failure everyone hits, and the meter turns it into a five-second check
+  instead of a mystery. Switching device takes effect immediately. The list is read when the
+  page loads, so **Rescan devices** is there for a headset paired after that. Mics are
+  remembered by name, and one that is absent falls back to the system default rather than
+  failing — and if a mic disappears mid-sermon the bridge notices within a few seconds and
+  reopens it, rather than sitting there translating silence.
+- **Listeners** — the QR code to hold up or print, and a count of how many phones are actually
+  connected right now.
+- **Translation quality** — the engine, the language model, the voice, how much context to
+  keep, how long a pause ends a sentence, and how much voice to buffer before playing. Most
+  need a restart and the console says so when it matters; the voice buffer applies at once.
+  The bridge tells each phone exactly where its MP3 connection began in the continuous audio
+  stream, so uneven MP3 and subtitle delivery cannot move a pop-up away from its voice. It
+  also excludes silent PCM at the head and tail of each generated utterance from subtitle
+  timing. Within the audible sentence, Chinese is revealed by character and English by
+  approximate syllable timing; exact phoneme timestamps are not available from the voices.
+  Choosing the omni engine greys out the three settings it does not use — the spoken language,
+  the language model and the context — rather than leaving them there to be set pointlessly.
+- **Glossary** — edit it in the browser. Saved changes apply to the very next sentence, no
+  restart, because the prompt is rebuilt per session update.
+- **Live transcript** — what was heard and what was said, as it happens.
+
+The console binds to localhost only, so nobody on the church wifi can stop your broadcast from
+their phone. Use the Mac itself.
+
+Settings are stored in `config.json` next to the script. You can edit that file instead if you
+prefer; the console just writes the same file.
+
+## Running it without you
+
+To have it come up by itself, install the **LaunchAgent** — an agent, not a daemon, because
+microphone access is granted per logged-in user and a root daemon can never get it:
+
+```bash
+sed "s|__DIR__|$PWD|g" com.church.sermon-translate.plist \
+    > ~/Library/LaunchAgents/com.church.sermon-translate.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.church.sermon-translate.plist
+```
+
+```bash
+tail -f sermon.log                                               # what it's doing
+launchctl kickstart -k gui/$(id -u)/com.church.sermon-translate  # restart it
+launchctl bootout gui/$(id -u)/com.church.sermon-translate       # stop it for good
+```
+
+Four things to get right on a Mac that nobody logs into on Sunday morning:
+
+- **Run `./start.sh` by hand once first** and grant the microphone prompt. Under launchd the
+  prompt is easy to miss, and a denied mic looks exactly like silence in the sanctuary.
+- **Turn on automatic login** (System Settings → Users & Groups). A LaunchAgent starts at
+  login, so a Mac sitting at the login screen is running nothing.
+- **Stop it sleeping** (System Settings → Lock Screen → never; Displays → prevent sleep when
+  the display is off). `caffeinate -i` covers idle sleep, not a scheduled or lid-close sleep.
+- **It stays loaded between services.** `KeepAlive` keeps the models in memory all week so
+  Sunday needs no warm-up. If that Mac has other jobs, drop `KeepAlive` and `RunAtLoad` and start it
+  with `launchctl kickstart` instead.
+
+## Tuning that actually matters
+
+All of this lives in the console; the notes below are why each one is there.
+
+- **Engine** — *Recognise → translate → speak* is the one to run on a Sunday. *Audio straight
+  into the model* is experimental: one model hears the sermon and writes the Chinese, with no
+  transcription step in between, which is worth about a quarter of a second a sentence and one
+  less model in memory. It needs a 64 GB+ Mac and the second environment from **Setup**;
+  `experiments/README.md` has the measurements and what had to be worked around to get a
+  conversational model to translate instead of answering.
+- **`glossary.txt`** — your ministry names and your elders' names. The single biggest quality
+  win available to you. On the cascade the 66 Chinese book names (和合本) are built into the
+  prompt, so only name a translation here if your church quotes a different one. The omni
+  engine has no such list — it does not need one, and including it made the model read the
+  list out loud instead of translating.
+  `cp glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
+  since it ends up full of real people's names. Keep it short — it is re-read on every
+  utterance, so a long one costs latency on every sentence of the sermon.
+- **One direction at a time.** The console translates the sermon into one language. If you
+  need English→Chinese and Chinese→English simultaneously, run a second copy of the repo on
+  another port with the directions reversed, and hand out two QR codes.
+- **Language model** — cascade only; the omni engine brings its own. 4B is the floor for
+  sermon register, 8B is visibly better on a 24 GB+ Mac, and on 64 GB+ the Qwen3.6 35B-A3B is
+  the one to pick. It is a mixture of experts with ~3B active, so it costs 0.5 s a sentence
+  against the 8B's 0.3 s rather than anything like its size. Watch for backlog warnings after
+  a change either way.
+
+  Bible book names are what separates them. The small models calque the English ordinal —
+  "Second John" becomes 第二封约翰书 instead of 约翰二书, and 4B renders a bare "John" as
+  约翰书 rather than 约翰福音. Scored on 72 spoken book references, greedy: 8B 58/72, 35B
+  68/72, and all four of the 35B's misses are it correctly naming the prophet rather than the
+  book. No prompt wording fixed the 8B — the variants that helped the numbered books broke
+  plain "John". The omni engine gets them right on its own, 6 of 7 including the numbered
+  ones, which is why it carries no book list.
+- **Context** — cascade only. 2 sentences keeps pronouns and topic consistent without letting
+  an hour of sermon fill the context window. Drop to 0 if the model starts chatting back. The
+  omni engine always runs at 0: given previous turns it starts answering the conversation
+  rather than translating it.
+- **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
+  to around 300 ms so clauses stay together.
+- **Voice engine** — Kokoro is the default: eight Mandarin voices, twenty American English
+  ones, and it keeps up with the preacher as long as the translator leaves it room. Piper is
+  the one to switch to when it does not. Piper runs on the CPU, so unlike the other two it
+  never waits for the translator to let go — and during a sermon the translator often has it.
+  One sentence of English, on this Mac:
+
+  | | Piper | Kokoro |
+  |---|---|---|
+  | GPU idle | 0.049 s | 0.077 s |
+  | GPU busy | 0.051 s | 0.553 s |
+
+  Idle they are the same engine; busy is the one that matters. It costs quality: Piper's
+  Chinese is flatter than Kokoro's and its English is a shade more mechanical. It also costs
+  the least memory of the three, and its voices are ~60 MB each rather than a model in the
+  Hugging Face cache.
+
+  Five English voices, and one Chinese one — 华言, female. Piper's other two Mandarin voices
+  read pinyin through g2pW, which is `pip install 'piper-tts[zh]'` and a 113 MB download on
+  top, so they are not offered.
+
+  Qwen3-TTS sounds better than either and is the slowest; switch to it if the room can spare
+  the speed, and back if `!! backlog, dropping audio` appears.
+- **Voice** — Kokoro and Piper; Qwen3-TTS has one voice of its own and the setting greys out.
+  Kokoro offers eight Mandarin voices and twenty American English ones, female and male;
+  Piper five English and one Chinese. The list follows what
+  listeners hear, because a voice comes with the phonemiser for its own language and an
+  American voice handed Chinese text reads it as the words "Chinese letter", once per
+  character. Changing what listeners hear therefore changes the voice too, and needs a
+  restart — the prompt can change mid-service, a loaded voice cannot.
+- **Voice buffer** — an MLX voice and the translator take turns on the one GPU, so the voice
+  arrives in gusts. The bridge buffers this much of it before playing, which is heard as
+  delay rather than as stuttering. It is also pure delay on every turn, so the default is
+  400 ms, which is a floor rather than an estimate: a service that never needs more never
+  pays for it, and one that does is given it. Raise it if the audio chops, lower it if the
+  voice lags behind the preacher; tune it by ear.
+  You do not have to catch it by ear, and you do not have to fix it by hand. A turn is
+  several sentences, and the translator writes each one only as the one before it is being
+  spoken; when it takes longer than the buffer holds, the voice runs out in the middle of the
+  utterance. The bridge notices, says `!! the voice ran out mid-sentence; buffering 650 ms`,
+  and keeps the extra buffer until a run of turns shows it is no longer needed. Your setting
+  is the floor it starts from, so lowering it stays worth doing — it just cannot cost you a
+  stuttering voice for the rest of the service.
+
+  Listeners' phones add a delay of their own — a browser buffers a second or two while it
+  joins the stream. The listener page keeps at least 1.25 s of that audio as protection
+  against uneven wifi, and only speeds up when it has more than that to spare — 6% fast, or
+  10% when it is more than two seconds clear of the reserve. If playback ever does run dry,
+  the reserve grows by half a second (up to 3 s) for the rest of the service.
+  Below half a second it plays 3% slower to bridge a short delivery gap without stopping in
+  the middle of a sentence. Subtitle reveal follows the audio clock, so the cushion does not
+  put the words ahead of the voice.
+
+  The translation is written far faster than it can be spoken — a sentence that takes five
+  seconds to say is generated in a fraction of one — so a subtitle published the moment it
+  existed runs seconds ahead of the voice reading it. Each line is therefore booked against
+  the position in the audio stream where its own sentence begins, and published when the
+  voice reaches it: measured against a live pipeline, that is between 3 and 11 seconds
+  earlier in the stream than the moment the text arrived, plus the tenth of a second the
+  encoder and the socket take to hand those bytes to a listener. Nothing queued means nothing
+  to wait for, so the first sentence after a pause is not held back at all.
+
+  What the preacher said is not held at all — nothing is reading it out, and it is the first
+  sign on screen that the room is being heard. Only the translation waits for its voice, and
+  by the time it arrives the preacher is a sentence or two further on. Each line therefore
+  carries the heard line it translates, and the page files it directly under that line rather
+  than at the bottom: the pair stays together, and the newest heard sentence keeps the three
+  dots until its own translation lands. A turn spoken as several sentences stacks them under
+  it in the order they were said.
+
+  A heard line also grows. Whisper does not transcribe a turn once: it transcribes what it
+  has so far, then the whole thing again as the preacher keeps going, correcting earlier
+  words on the way. Each pass arrives as a finished transcription of its own, so a single
+  sentence would fill the transcript four times over. Passes that are recognisably the same
+  turn carry one id, and the screen revises the line it is already showing.
+
+  Between the two, three dots pulse under the heard line: its translation is waiting for the
+  voice to reach it, which on a phone with a full buffer is a few seconds of a screen that
+  would otherwise look like it had stopped working. They show whenever the newest line is one
+  that was heard, so a sentence the translator answers with nothing — what it is told to do
+  when the preacher is already speaking the listeners' language — cannot leave them spinning
+  for the rest of the service.
+
+  The phone holds each line until playback reaches the point where that line is audible.
+  This is not inferred from packet arrival: the MP3 handler records the global CBR stream
+  position of the first bytes sent to each audio connection and sends that origin privately
+  to the matching subtitle connection. Each translated line carries its position on the
+  bridge's continuous PCM clock, including silence between turns. The difference maps it
+  directly into `audio.currentTime`, so separate MP3/SSE network bursts, a rebuffer, catch-up
+  playback, startup, and reconnects cannot move one line independently of its voice.
+
+  TTS engines can also put silent PCM around a sentence. The bridge finds the first and last
+  audible samples and uses those bounds for the line's start and reveal duration; generated
+  silence therefore cannot put the pop-up ahead of speech or stretch its words. The phone
+  reveals Chinese by character and English by approximate syllable, including punctuation
+  pauses, clocked by the audio rather than the wall. These are still not phoneme timestamps,
+  so timing inside a sentence is approximate. With audio off, text and recent backlog appear
+  whole as soon as they arrive.
+
+## What this is not
+
+- **It lags about a second, plus the phone.** Turn-based: nothing is translated until the
+  preacher pauses, then recognition, translation, the voice, and the voice buffer all stack
+  up. Measured on a recorded sermon from last speech to the first audio leaving the pipeline:
+  about 1 s on the cascade, 0.4–0.7 s on omni. The phone's own MP3 buffer adds more on top and
+  is not included in those numbers. Fine for preaching, useless for back-and-forth Q&A. Tell
+  listeners to use headphones and not to expect lip-sync.
+- **Word-level subtitle timing is approximate.** Sentence onset is tied to audible PCM and
+  the phone's exact MP3 stream origin. Inside the sentence, Chinese is spread by character
+  and English by approximate syllable. Those are not phoneme timestamps, so an individual
+  word may still appear slightly early or late. With audio off, each subtitle is shown in
+  full as soon as it arrives.
+- **A preacher who never pauses will drift.** Nothing is translated until a pause, so a run of
+  speech with no gaps in it is held whole: measured on 18 s of continuous speech, the first
+  translated word reached the listener at 20 s. Normal preaching pauses between sentences and
+  costs about a second; this is the tail, not the common case.
+
+  The pipeline's `--max_speech_ms` looks like the fix and is not. It does split a long run, but
+  each forced split supersedes the one before it, and the earlier fragments are dropped as
+  stale: on that same 18 s sample it produced 1.9 s of audio for 20 s of speech — one sentence
+  out of six. Leave it at its default. Past 20 s of backlog `bridge.py` drops audio and resyncs
+  to live, so a listener hears a gap rather than an ever-growing delay.
+- **It will mistranslate.** Local models get theology wrong in interesting ways, the small
+  ones spectacularly so. The 35B is the most reliable of the translators and is still a local
+  model. Treat it as a hearing aid for visitors, not as the sermon of record.
+- **The omni engine has never run a live service.** Everything claimed for it here was
+  measured against recorded audio. Each time it met something new it failed in a way nobody
+  would have predicted — holding a conversation, reading the Bible book list out loud, opening
+  every sentence with the word "assistant". Keep the cascade a click away.
+
+## Where the models live
+
+The first run downloads about 4 GB into your home directory, not into the project folder,
+so deleting the repo reclaims none of it. Switching the translator in the console downloads
+that model too, the first time you select it: the 8B is 4.6 GB, the 35B is 37.7 GB and the omni
+engine's model is 38.8 GB, and none of them replaces what is already there. The omni model lands
+in the same cache even though it runs from `.venv-omni`.
+
+| | |
+|---|---|
+| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~4 GB, plus any translator or voice engine you switched to |
+| `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
+| `~/.cache/piper-voices` | Piper's voices, ~60 MB each, downloaded the first time one is selected |
+
+To clear them, activate this project's environment and remove them by name:
+
+```bash
+source .venv/bin/activate
+hf cache ls                    # what is cached, and how big
+
+hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
+            model/mlx-community/whisper-large-v3-turbo \
+            model/mlx-community/Kokoro-82M-bf16
+
+# only if you switched the translator or the voice engine in the console, or ran
+# a version that used Smart Turn; hf cache ls above shows which you actually have
+hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/Qwen3-8B-4bit \
+            model/mlx-community/Qwen3.6-35B-A3B-8bit \
+            model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit \
+            model/pipecat-ai/smart-turn-v3
+
+hf cache prune                 # half-finished downloads
+
+# remove one Piper voice and its required config, if you switched to Piper and back
+rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
+      ~/.cache/piper-voices/zh_CN-huayan-medium.onnx.json
+```
+
+**Do not just `rm -rf ~/.cache/huggingface`.** That directory is shared by every Hugging Face
+tool on the Mac and very likely holds models belonging to your other work. Run `hf cache ls`
+first, and add `--dry-run` to preview what a removal would take. Once removed, the next start
+downloads them again and the console sits on "starting" until it finishes.
+
+## Self-check
+
+```bash
+python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out, config
+                         # validation, clean shutdown on TERM/HUP, console refuses the LAN,
+                         # the mic watchdog, and the prompt and proxy the omni engine needs
+python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids, the
+                         # theme toggle always flips, and the console script runs against both
+                         # engines (needs node)
+```
+
+The pipeline itself has no self-check here: start it and read `sermon.log`, where every
+transcript and its translation is printed as it happens.

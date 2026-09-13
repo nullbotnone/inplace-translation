@@ -87,7 +87,7 @@
         </div>
 
         <div class="phone-play">
-          <span>▶</span><span>PLAYING · ≈1s BEHIND</span>
+          <span>▶</span><span>VOICE + TEXT · SYNCED</span>
         </div>
       </div>
     </div>
@@ -99,9 +99,9 @@
         <p class="kicker"><b>01</b> / <span data-zh="工作原理" data-tw="工作原理" data-en="How it works"></span></p>
         <h2 data-zh="整条流程都在一台 Mac 上" data-tw="整條流程都在一台 Mac 上" data-en="The whole chain on one Mac"></h2>
       </div>
-      <p data-zh="音控台把讲员的声音送入 Mac。系统按句子切分，转写成文字，在本地翻译，再由本地的语音读出，最后以普通的 MP3 流广播出去，任何手机浏览器都能收听。另有一种引擎去掉了转写这一步，整句音频直接送入一个能听的模型。它更快，但需要 64 GB 的 Mac，目前仍属实验性质。"
-         data-tw="音控台把講員的聲音送入 Mac。系統按句子切分，轉寫成文字，在本地翻譯，再由本地的語音讀出，最後以普通的 MP3 串流廣播出去，任何手機瀏覽器都能收聽。另有一種引擎去掉了轉寫這一步，整句音訊直接送入一個能聽的模型。它更快，但需要 64 GB 的 Mac，目前仍屬實驗性質。"
-         data-en="The sound desk feeds the Mac. Voice detection divides the preacher into sentences, Whisper transcribes each one, a local model translates it, and a local voice speaks the translation. The result leaves the Mac as an ordinary MP3 stream that any phone browser can play. A second engine removes the transcription step and sends the sentence's audio directly into a model that hears it. That engine is faster, requires a 64 GB Mac, and remains experimental."></p>
+      <p data-zh="音控台把讲员的声音送入 Mac。系统按句子切分，转写成文字，在本地翻译，再由本地语音读出，最后以普通 MP3 流广播到手机。系统会找出每句合成语音真正有声的部分，并把字幕锁定在每台手机自己的音频时间轴上，因此网络缓冲不会让文字跑到声音前面。另有实验引擎可将整句音频直接交给模型，需要 64 GB 内存。"
+         data-tw="音控台把講員的聲音送入 Mac。系統按句子切分，轉寫成文字，在本地翻譯，再由本地語音讀出，最後以普通 MP3 串流廣播到手機。系統會找出每句合成語音真正有聲的部分，並把字幕鎖定在每台手機自己的音訊時間軸上，因此網路緩衝不會讓文字跑到聲音前面。另有實驗引擎可將整句音訊直接交給模型，需要 64 GB 記憶體。"
+         data-en="The sound desk feeds the Mac. Voice detection divides the preacher into sentences, Whisper transcribes each one, a local model translates it, and a local voice speaks it as an ordinary MP3 stream. The bridge finds the audible part of every generated sentence and locks its subtitle to each phone's own audio timeline, so network buffering does not put text ahead of the voice. An experimental 64 GB engine can instead send each sentence's audio directly to a model that hears it."></p>
     </div>
 
     <div class="stage">
@@ -194,10 +194,10 @@
       </div>
       <div class="feature">
         <p class="kicker">C</p>
-        <h3 data-zh="字幕与语音并行" data-tw="字幕與語音並行" data-en="Subtitles as well as voice"></h3>
-        <p data-zh="同一条流程也产出文字，因此页面上同时有实时字幕。听障的会友可以使用，读得比听得快的人同样可以。"
-           data-tw="同一條流程也產出文字，因此頁面上同時有即時字幕。聽障的會友可以使用，讀得比聽得快的人同樣可以。"
-           data-en="The same pipeline produces text, so the page also shows live subtitles. They serve deaf members, and anyone who reads a language faster than they hear it."></p>
+        <h3 data-zh="字幕跟随语音" data-tw="字幕跟隨語音" data-en="Subtitles follow the voice"></h3>
+        <p data-zh="每台手机都会收到自己这条 MP3 流的准确起点。译文等到对应语音真正开始才出现，即使手机正在缓冲、追赶直播或重新连接，也不会按网络包到达的先后顺序猜测时间。"
+           data-tw="每台手機都會收到自己這條 MP3 串流的準確起點。譯文等到對應語音真正開始才出現，即使手機正在緩衝、追趕直播或重新連線，也不會按網路封包抵達的先後順序猜測時間。"
+           data-en="Each phone receives the exact starting position of its own MP3 stream. A translation waits for its audible voice even while the phone buffers, catches up, or reconnects; timing is never guessed from packet arrival order."></p>
       </div>
       <div class="feature">
         <p class="kicker">D</p>
@@ -205,6 +205,13 @@
         <p data-zh="词表里写你们的事工名称、长老姓名，以及你们引用的圣经译本。它在控制台中编辑，下一句即生效，无需重启。和合本 66 卷书名已包含在提示词中，不必另行列出。"
            data-tw="詞表裡寫你們的事工名稱、長老姓名，以及你們引用的聖經譯本。它在控制台中編輯，下一句即生效，無需重啟。和合本 66 卷書名已包含在提示詞中，不必另行列出。"
            data-en="The glossary holds your ministry names, your elders' names, and the Bible translation you quote. It is edited in the console and applies to the next sentence without a restart. The 66 Chinese book names are already in the prompt and need not be listed."></p>
+      </div>
+      <div class="feature">
+        <p class="kicker">E</p>
+        <h3 data-zh="缓冲会自行调整" data-tw="緩衝會自行調整" data-en="Buffering adapts itself"></h3>
+        <p data-zh="若语音生成一时跟不上，桥接程序会自动增加语音缓冲，稳定后再缓慢减少。手机保留安全的网络缓冲，必要时轻微加速追赶直播，断线后也会自动重连。"
+           data-tw="若語音產生一時跟不上，橋接程式會自動增加語音緩衝，穩定後再緩慢減少。手機保留安全的網路緩衝，必要時輕微加速追趕直播，斷線後也會自動重連。"
+           data-en="If synthesis falls behind, the bridge raises its voice buffer and slowly gives it back after stable turns. Phones retain a safe network reserve, catch up gently when possible, and reconnect automatically."></p>
       </div>
     </div>
   </section>
@@ -246,9 +253,11 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
        data-en="After this one setup, each Sunday begins with a double-click on Start Translation.command in Finder. A Terminal window opens and the console appears in the browser on its own, with nothing to type. Closing the window stops the translation and releases the memory the models were holding."></p>
 
     <p class="prose"
-       data-zh="若希望系统登录后自行启动，README 中提供了一个 LaunchAgent。实验性的音频直入引擎也记在那里，它需要另建一个虚拟环境，并再下载 38.8 GB 模型。除非你有 64 GB 的 Mac 并打算试用，否则可以先不安装。"
-       data-tw="若希望系統登入後自行啟動，README 中提供了一個 LaunchAgent。實驗性的音訊直入引擎也記在那裡，它需要另建一個虛擬環境，並再下載 38.8 GB 模型。除非你有 64 GB 的 Mac 並打算試用，否則可以先不安裝。"
-       data-en="If you would rather the system started by itself, the README describes a LaunchAgent. It also covers the experimental audio-in engine, which needs a second virtualenv and a further 38.8 GB of model. Leave that engine aside unless you have a 64 GB Mac and wish to test it."></p>
+       data-zh="若希望系统登录后自行启动，技术与运维指南中提供了 LaunchAgent。该指南也记录了实验性的音频直入引擎；它需要另建虚拟环境并再下载 38.8 GB 模型。除非你有 64 GB 的 Mac 并打算测试，否则可以暂不安装。"
+       data-tw="若希望系統登入後自行啟動，技術與維運指南中提供了 LaunchAgent。該指南也記錄了實驗性的音訊直入引擎；它需要另建虛擬環境並再下載 38.8 GB 模型。除非你有 64 GB 的 Mac 並打算測試，否則可以暫不安裝。"
+       data-en="For unattended startup, the technical and operations guide includes a LaunchAgent. It also covers the experimental audio-in engine, which needs a second virtualenv and another 38.8 GB model. Leave it aside unless you have a 64 GB Mac and want to test it."></p>
+    <p class="prose"><a href="https://github.com/nullbotnone/inplace-translation/blob/main/TECHNICAL_GUIDE.md" target="_blank" rel="noopener"
+       data-zh="阅读技术与运维指南 ↗" data-tw="閱讀技術與維運指南 ↗" data-en="Read the technical and operations guide ↗"></a></p>
   </section>
 
   <section class="band">
@@ -276,9 +285,9 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
         <span class="kicker">02</span>
         <div>
           <b data-zh="逐字字幕时间是近似值" data-tw="逐字字幕時間是近似值" data-en="Word-level subtitle timing is approximate"></b>
-          <p data-zh="开启音频后，手机会将每条译文保留到相应语音开始播放，再按该句时长逐步显示：中文按字，英文按词。这不是音素级时间戳，因此个别词仍可能略早或略晚。关闭音频时，字幕会在收到后立即完整显示。"
-             data-tw="開啟音訊後，手機會將每條譯文保留到相應語音開始播放，再按該句時長逐步顯示：中文按字，英文按詞。這不是音素級時間戳，因此個別詞仍可能略早或略晚。關閉音訊時，字幕會在收到後立即完整顯示。"
-             data-en="With audio on, the phone holds each translation until its sentence starts playing, then reveals Chinese by character and English by word across that sentence's duration. These are not phoneme timestamps, so an individual word may still appear slightly early or late. With audio off, each subtitle appears in full as soon as it arrives."></p>
+          <p data-zh="开启音频后，桥接程序会从计时中排除合成语音开头与结尾的静音，并告诉手机其 MP3 流在全局音频时间轴上的准确起点。每条译文会等到可听见的语音开始，再按实际有声时长逐步显示：中文按字，英文按近似音节。这不是音素级时间戳，因此句子起点会同步，个别词仍可能略早或略晚。关闭音频时，字幕会立即完整显示。"
+             data-tw="開啟音訊後，橋接程式會從計時中排除合成語音開頭與結尾的靜音，並告訴手機其 MP3 串流在全域音訊時間軸上的準確起點。每條譯文會等到可聽見的語音開始，再按實際有聲時長逐步顯示：中文按字，英文按近似音節。這不是音素級時間戳，因此句子起點會同步，個別詞仍可能略早或略晚。關閉音訊時，字幕會立即完整顯示。"
+             data-en="With audio on, the bridge excludes generated silence from timing and tells the phone exactly where its MP3 stream begins on the global audio timeline. Each translation waits for audible speech, then reveals Chinese by character and English by approximate syllable across the audible duration. Sentence onset is synchronized; individual words can still vary because the voices provide no phoneme timestamps. With audio off, the full subtitle appears immediately."></p>
         </div>
       </li>
       <li>
@@ -320,7 +329,7 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
       <tr><td data-zh="翻译" data-tw="翻譯" data-en="Translation"></td><td data-zh="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地运行" data-tw="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地執行" data-en="Qwen3 4B, 8B or Qwen3.6 35B-A3B, quantised, running locally"></td></tr>
       <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，由一个模型同时听取与翻译；需要 64 GB，尚未在真实聚会中使用过" data-tw="Qwen3-Omni 30B-A3B，由一個模型同時聽取與翻譯；需要 64 GB，尚未在真實聚會中使用過" data-en="Qwen3-Omni 30B-A3B. One model both hears and translates. It needs 64 GB and has not yet run a live service"></td></tr>
       <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Kokoro，中英文各有多种声音；翻译繁忙时可改用 Piper，它在 CPU 上运行，不与翻译抢 GPU；需要更佳音质时改用 Qwen3-TTS" data-tw="Kokoro，中英文各有多種聲音；翻譯繁忙時可改用 Piper，它在 CPU 上執行，不與翻譯搶 GPU；需要更佳音質時改用 Qwen3-TTS" data-en="Kokoro, with a choice of Chinese and English voices; Piper when the translator is busy, since it runs on the CPU and never waits for the GPU; Qwen3-TTS for the best quality"></td></tr>
-      <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉成 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, distributed by Python's standard-library HTTP server"></td></tr>
+      <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成连续 MP3，由 Python HTTP 服务器分发；每台手机另获其流起点，以同步语音与字幕" data-tw="ffmpeg 轉成連續 MP3，由 Python HTTP 伺服器分發；每台手機另獲其串流起點，以同步語音與字幕" data-en="A continuous ffmpeg MP3 stream from Python's HTTP server, with a per-phone stream origin that synchronizes voice and subtitles"></td></tr>
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>
   </section>
@@ -391,9 +400,9 @@ rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
 
 <footer>
   <a class="footer-brand" href="/">slashai.app</a>
-  <p data-zh="为一间确实需要它的教会而建。如果你在别处使用，或遇到 README 未涵盖的故障，欢迎提交 issue。"
-     data-tw="為一間確實需要它的教會而建。如果你在別處使用，或遇到 README 未涵蓋的故障，歡迎提交 issue。"
-     data-en="Built for a church that needed it. If you run it elsewhere, or it fails in a way the README does not describe, please open an issue."></p>
+  <p data-zh="为一间确实需要它的教会而建。如果你在别处使用，或遇到文档未涵盖的故障，欢迎提交 issue。"
+     data-tw="為一間確實需要它的教會而建。如果你在別處使用，或遇到文件未涵蓋的故障，歡迎提交 issue。"
+     data-en="Built for a church that needed it. If you run it elsewhere, or encounter a failure the documentation does not cover, please open an issue."></p>
   <p class="foot-links"><a href="https://github.com/nullbotnone/inplace-translation" target="_blank" rel="noopener">GitHub ↗</a></p>
 </footer>
 
