@@ -7,6 +7,8 @@ import html.parser, re, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+WEB = ROOT / "web"      # the pages bridge.py serves
 LANGS = ("zh", "tw", "en")
 VOID = {"meta", "link", "br", "img", "input", "hr", "source", "area", "col", "option"}
 
@@ -88,7 +90,7 @@ def themed(css, path):
 
 
 # ---- the operator console: trilingual, themed, self-contained
-admin = (HERE / "admin.html").read_text()
+admin = (WEB / "admin.html").read_text()
 balanced(admin, "admin.html")
 ids_resolve(admin, "admin.html")
 n_admin = trilingual(admin, "admin.html")
@@ -105,12 +107,12 @@ looked_up |= {"stopped", "starting", "running", "error"}      # t(s.state), from
 assert not looked_up - keys["en"], f"console looks up undefined strings {sorted(looked_up - keys['en'])}"
 
 # ---- the listener page: one language pair on purpose, both spelled out inline
-listener = (HERE / "index.html").read_text()
+listener = (WEB / "index.html").read_text()
 balanced(listener, "index.html")
 
 # ---- the public landing page
-page = (HERE / "docs" / "index.html").read_text()
-css = (HERE / "docs" / "styles.css").read_text()
+page = (ROOT / "docs" / "index.html").read_text()
+css = (ROOT / "docs" / "styles.css").read_text()
 balanced(page, "docs/index.html")
 n_page = trilingual(page, "docs/index.html")
 no_children_under_translation(page, "docs/index.html")
@@ -142,7 +144,7 @@ else:
     print("note: node not found, skipped the page runtime checks")
 
 # the served copy and the site's copy are the same mark; nothing keeps them in step but this
-assert (HERE / "favicon.svg").read_bytes() == (HERE / "docs" / "favicon.svg").read_bytes(), \
+assert (WEB / "favicon.svg").read_bytes() == (ROOT / "docs" / "favicon.svg").read_bytes(), \
     "favicon.svg and docs/favicon.svg have drifted apart"
 
 print(f"ok: console {n_admin} labels + {len(keys['en'])} runtime strings x3 langs, "

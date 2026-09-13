@@ -2,6 +2,8 @@
 import base64, json, queue, signal, socket, sys, tempfile, threading, time
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 import bridge
 
 b64 = lambda raw: base64.b64encode(raw).decode()
@@ -365,7 +367,7 @@ assert "Copy this file" not in prompt and "indented comments" not in prompt
 assert "elder -> 长老" in prompt and "not#a#comment -> ok" in prompt
 
 # the shipped example is safe to paste in whole: nothing in it addresses the reader
-example = (Path(__file__).parent / "glossary.example.txt")
+example = (ROOT / "web" / "glossary.example.txt")
 bridge.GLOSSARY_PATH.write_text(example.read_text())
 prompt = bridge.instructions(en2zh)
 assert "#" not in prompt.split(bridge.base_prompt(en2zh))[-1], "a comment survived"
@@ -756,14 +758,13 @@ assert blocked.local_only() is False and blocked.err == 403, "console exposed to
 # launchd sends TERM and closing the Terminal window sends HUP; without a handler for
 # both, ffmpeg and the pipeline are orphaned.
 import os, subprocess, sys
-here = Path(__file__).parent
 # The child writes config.json in its own directory. Hold whatever the operator had saved
 # there and put it back afterwards, so running the self-check never costs them their setup.
-saved_config = (here / "config.json").read_bytes() if (here / "config.json").exists() else None
+saved_config = (ROOT / "config.json").read_bytes() if (ROOT / "config.json").exists() else None
 # The child does not start the translation pipeline, so it leaves the operator's model state
 # untouched. An ephemeral port keeps it separate from a live console the operator may be using.
-proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start", "--port", "0"],
-                        cwd=here, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+proc = subprocess.Popen([sys.executable, str(ROOT / "bridge.py"), "--no-start", "--port", "0"],
+                        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         start_new_session=True)
 try:
     time.sleep(.25)                 # give the bridge time to start its encoder and HTTP server
@@ -777,9 +778,9 @@ finally:
     if proc.poll() is None:
         proc.kill()
     if saved_config is None:
-        (here / "config.json").unlink(missing_ok=True)
+        (ROOT / "config.json").unlink(missing_ok=True)
     else:
-        (here / "config.json").write_bytes(saved_config)
+        (ROOT / "config.json").write_bytes(saved_config)
 
 # stop() has to take the pipeline subprocess with it; that is the one that does not die
 # on its own when the bridge goes away.

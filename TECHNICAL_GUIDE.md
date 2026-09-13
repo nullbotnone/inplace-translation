@@ -233,7 +233,7 @@ All of this lives in the console; the notes below are why each one is there.
   prompt, so only name a translation here if your church quotes a different one. The omni
   engine has no such list — it does not need one, and including it made the model read the
   list out loud instead of translating.
-  `cp glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
+  `cp web/glossary.example.txt glossary.txt`, or just paste into the console. It is gitignored,
   since it ends up full of real people's names. Keep it short — it is re-read on every
   utterance, so a long one costs latency on every sentence of the sermon.
 - **One direction at a time.** The console translates the sermon into one language. If you
@@ -434,12 +434,12 @@ downloads them again and the console sits on "starting" until it finishes.
 ## Self-check
 
 ```bash
-python3 test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out, config
-                         # validation, clean shutdown on TERM/HUP, console refuses the LAN,
-                         # the mic watchdog, and the prompt and proxy the omni engine needs
-python3 check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids, the
-                         # theme toggle always flips, and the console script runs against both
-                         # engines (needs node)
+python3 tests/test_bridge.py   # pacing, backlog drop, listener eviction, subtitle fan-out, config
+                               # validation, clean shutdown on TERM/HUP, console refuses the LAN,
+                               # the mic watchdog, and the prompt and proxy the omni engine needs
+python3 tests/check_pages.py   # every label in 简/繁/EN, both themes complete, no dead ids, the
+                               # theme toggle always flips, and the console script runs against both
+                               # engines (needs node)
 ```
 
 The pipeline itself has no self-check here: start it and read `sermon.log`, where every

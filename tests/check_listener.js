@@ -4,7 +4,7 @@
  */
 const fs = require("fs");
 const vm = require("node:vm");
-const src = fs.readFileSync(`${__dirname}/index.html`, "utf8");
+const src = fs.readFileSync(`${__dirname}/../web/index.html`, "utf8");
 const script = src.slice(src.indexOf("<script>") + 8, src.lastIndexOf("</script>"));
 
 function el(tag = "div") {

@@ -96,10 +96,10 @@ glossary, target language, and voice-buffer changes apply live where possible.
 ## Check the installation
 
 ```bash
-python3 test_bridge.py
-python3 check_pages.py
-node check_listener.js
-node check_console.js
+python3 tests/test_bridge.py
+python3 tests/check_pages.py
+node tests/check_listener.js
+node tests/check_console.js
 ```
 
 For ordinary use, the operator console is the manual. If something unusual happens,

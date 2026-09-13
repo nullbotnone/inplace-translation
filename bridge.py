@@ -1148,7 +1148,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def send_file(self, name, ctype):
-        body = (HERE / name).read_bytes()
+        body = (HERE / "web" / name).read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         # The console is read fresh from disk on every request, but a browser that cached an

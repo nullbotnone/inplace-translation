@@ -4,7 +4,7 @@
  * leaves the rest of the page blank. Run: node check_console.js
  */
 const fs = require("fs");
-const src = fs.readFileSync(`${__dirname}/admin.html`, "utf8");
+const src = fs.readFileSync(`${__dirname}/../web/admin.html`, "utf8");
 const script = src.slice(src.indexOf("<script>") + 8, src.lastIndexOf("</script>"));
 
 const ids = [...src.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
