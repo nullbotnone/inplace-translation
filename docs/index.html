@@ -275,10 +275,10 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
       <li>
         <span class="kicker">02</span>
         <div>
-          <b data-zh="字幕比语音先到" data-tw="字幕比語音先到" data-en="Subtitles arrive before the voice"></b>
-          <p data-zh="模型一写完，文字便已存在，而语音仍需合成与缓冲，因此字幕会提前一两秒。系统不会将两者对齐，文字先于语音出现是预期的行为。"
-             data-tw="模型一寫完，文字便已存在，而語音仍需合成與緩衝，因此字幕會提前一兩秒。系統不會將兩者對齊，文字先於語音出現是預期的行為。"
-             data-en="The text exists as soon as the model finishes, while the voice still has to be synthesised and buffered, so the subtitles run a second or two ahead. Nothing aligns them. Reading ahead of the voice is the intended behaviour."></p>
+          <b data-zh="逐字字幕时间是近似值" data-tw="逐字字幕時間是近似值" data-en="Word-level subtitle timing is approximate"></b>
+          <p data-zh="开启音频后，手机会将每条译文保留到相应语音开始播放，再按该句时长逐步显示：中文按字，英文按词。这不是音素级时间戳，因此个别词仍可能略早或略晚。关闭音频时，字幕会在收到后立即完整显示。"
+             data-tw="開啟音訊後，手機會將每條譯文保留到相應語音開始播放，再按該句時長逐步顯示：中文按字，英文按詞。這不是音素級時間戳，因此個別詞仍可能略早或略晚。關閉音訊時，字幕會在收到後立即完整顯示。"
+             data-en="With audio on, the phone holds each translation until its sentence starts playing, then reveals Chinese by character and English by word across that sentence's duration. These are not phoneme timestamps, so an individual word may still appear slightly early or late. With audio off, each subtitle appears in full as soon as it arrives."></p>
         </div>
       </li>
       <li>

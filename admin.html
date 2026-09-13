@@ -761,6 +761,7 @@ $("clearlog").onclick = () => {
   empty.dataset.en = "No transcript yet.";
   empty.textContent = empty.dataset[lang];
   $("log").replaceChildren(empty);
+  onScreen.clear();
   toast("cleared");
 };
 

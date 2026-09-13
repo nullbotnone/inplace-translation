@@ -341,9 +341,11 @@ All of this lives in the console; the notes below are why each one is there.
   about 1 s on the cascade, 0.4–0.7 s on omni. The phone's own MP3 buffer adds more on top and
   is not included in those numbers. Fine for preaching, useless for back-and-forth Q&A. Tell
   listeners to use headphones and not to expect lip-sync.
-- **Subtitles arrive before the audio they narrate**, by a second or two — the text exists as
-  soon as the LLM finishes, the voice has to be synthesised and buffered. Nothing lines them
-  up; reading ahead of the voice is the intended behaviour, not a bug to fix.
+- **Word-level subtitle timing is approximate.** With audio on, the phone holds each
+  translation until its sentence starts playing, then reveals Chinese by character and
+  English by word across that sentence's duration. Those are not phoneme timestamps, so an
+  individual word may still appear slightly early or late. With audio off, each subtitle is
+  shown in full as soon as it arrives.
 - **A preacher who never pauses will drift.** Nothing is translated until a pause, so a run of
   speech with no gaps in it is held whole: measured on 18 s of continuous speech, the first
   translated word reached the listener at 20 s. Normal preaching pauses between sentences and

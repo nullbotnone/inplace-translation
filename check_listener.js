@@ -209,6 +209,11 @@ ids.a.currentTime = 199.8;                 // playing the first range, a fifth o
 tick();
 if (ids.a.playbackRate !== 1)
   throw new Error(`chased ${ids.a.playbackRate}x against a range it is not playing`);
+ids.a.currentTime = 500;                   // stalled in the gap; neither range is live
+ids.a.playbackRate = 1;
+tick();
+if (ids.a.playbackRate !== 1)
+  throw new Error(`chased ${ids.a.playbackRate}x across an unbuffered gap`);
 
 eventSource.onerror();
 if (ids.connection.dataset.state !== "offline") throw new Error("disconnect was not surfaced");

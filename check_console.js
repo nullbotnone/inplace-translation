@@ -23,7 +23,10 @@ function el(tag = "div") {
     setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; },
     appendChild(c) { c.parent = this; this.children.push(c); return c; },
     append(...c) { c.forEach((x) => { x.parent = this; }); this.children.push(...c); },
-    querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    querySelector(sel) {
+      return sel === ".empty" ? this.children.find((kid) => kid.className === "empty") ?? null : null;
+    },
+    querySelectorAll: () => [], closest: () => null,
     // A node that is not in the tree removes to nothing, the way the DOM does; splicing at
     // an index of -1 would take the last child with it instead.
     remove() {
@@ -235,6 +238,13 @@ if (nthLast(2) === "死亡的原因") errors.push("the console left the unfinish
 listeners.line({ data: JSON.stringify({ kind: "out", text: "What causes death?", at: "10:41:03", id: 92 }) });
 if (nthLast(1) !== "What causes death?" || nthLast(2) !== "死亡的原因是什么呢")
   errors.push("the translation did not start its own line");
+
+// Clearing removes the rows and their id cache. Otherwise a later revision with the same id
+// updates a detached node and silently leaves the console showing "No transcript yet."
+byId.clearlog.onclick();
+listeners.line({ data: JSON.stringify({ kind: "src", text: "A revised line", at: "10:41:05", id: 91 }) });
+if (byId.log.children.length !== 1 || byId.log.children[0].className === "empty")
+  errors.push("a line whose old copy was cleared stayed hidden");
 
 if (errors.length) {
   console.error("console script failed:\n  " + errors.join("\n  "));
