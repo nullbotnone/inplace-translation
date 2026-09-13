@@ -88,6 +88,19 @@ const latest = () => lines().at(-1).children[1].textContent;   // the transcript
 const say = (kind, text, secs) =>
   eventSource.onmessage({ data: JSON.stringify({ kind, text, at: "10:41:00", secs }) });
 
+// If the subtitle socket wins the race at startup, there is no buffered edge yet. The text
+// must wait for one instead of popping up before the phone can play any of its voice.
+ids.a.paused = true; ids.a.currentTime = 0; ids.a.buffered = { length: 0 };
+ids.b.onclick();
+say("out", "wait for the first audio", 2);
+tick();
+if (latest() === "wait for the first audio") throw new Error("subtitle beat the initial audio buffer");
+ids.a.buffered = buffered(0, 1); tick();
+if (latest() === "wait for the first audio") throw new Error("subtitle ignored the new audio buffer");
+ids.a.paused = false; ids.a.currentTime = 1; tick();
+if (!latest().startsWith("wait")) throw new Error("subtitle never joined its first audio");
+ids.b.onclick();
+
 // A translation is held until the playhead reaches the position where its own audio sits --
 // the end of what this phone holds when the line arrives. Two seconds of buffer is two
 // seconds of waiting, and the wait is a position rather than a timer, so nothing about a
@@ -172,7 +185,17 @@ ids.a.currentTime = 104; tick();
 if (body.textContent !== "神爱世人") throw new Error("the line never completed");
 ids.a.currentTime = 999; tick();          // finished lines stop costing anything
 
+// A delayed release starts at the voice's booked position, not at the late UI tick. After a
+// one-second stall the reveal must catch up to the voice instead of beginning again at word 1.
+ids.a.currentTime = 200; ids.a.buffered = buffered(0, 200);
+say("out", "我们彼此相爱", 6);
+ids.a.currentTime = 203; tick();
+const caughtUp = lines().at(-1).children[1];
+if (caughtUp.textContent.length < 4)
+  throw new Error(`late subtitle restarted behind the voice: ${caughtUp.textContent}`);
+
 // English is counted by the word
+ids.a.currentTime = 999;
 ids.a.buffered = buffered(0, 999);
 say("out", "Grace and peace", 3);
 tick();
@@ -181,20 +204,43 @@ if (english.textContent !== "Grace") throw new Error(`expected one word, got ${e
 ids.a.currentTime = 1002; tick();
 if (english.textContent !== "Grace and peace") throw new Error("the English line never completed");
 
-// Whatever the phone buffered on the way in never drains by itself: the stream carries
-// silence between sentences, so the playhead keeps its distance from the live edge and the
-// voice lags the subtitle of the same sentence forever. Play slightly fast until it closes.
+// A pause after punctuation is part of speech timing. A long word after a comma should not
+// pop up on the old character-count schedule while the voice is still taking that pause.
+ids.a.currentTime = 1100; ids.a.buffered = buffered(0, 1100);
+say("out", "I, therefore, urge", 6);
+tick();
+const punctuated = lines().at(-1).children[1];
+ids.a.currentTime = 1100.8; tick();
+if (punctuated.textContent !== "I,")
+  throw new Error(`English punctuation pause was skipped: ${punctuated.textContent}`);
+ids.a.currentTime = 1106; tick();
+if (punctuated.textContent !== "I, therefore, urge")
+  throw new Error("punctuated English line never completed");
+
+// Keep a safe jitter buffer. The old catch-up drained this to 0.4 s, so a short Wi-Fi gap
+// stopped the voice in the middle of a sentence. A large reserve is still chased gently,
+// while a critical one slows down enough to give the next network burst time to arrive.
 const behind = (seconds) => {
   ids.a.currentTime = 100;
   ids.a.buffered = buffered(0, 100 + seconds);
 };
 ids.a.paused = false;
 behind(1.2); tick();
-if (ids.a.playbackRate <= 1) throw new Error("a phone a second behind never caught up");
+if (ids.a.playbackRate !== 1) throw new Error("the safe audio reserve was drained");
 behind(3); tick();
-if (ids.a.playbackRate < 1.1) throw new Error("three seconds behind was chased no harder");
+if (ids.a.playbackRate <= 1) throw new Error("an excessive audio reserve was never chased");
 behind(0.3); tick();
-if (ids.a.playbackRate !== 1) throw new Error("playback stayed fast after catching up");
+if (ids.a.playbackRate >= 1) throw new Error("a critical audio reserve was not protected");
+behind(1.5); tick();
+if (ids.a.playbackRate !== 1) throw new Error("playback did not settle at its safe reserve");
+
+// A real underrun teaches this phone to keep a larger reserve. After waiting, two seconds is
+// no longer treated as spare audio to burn through at a faster playback rate.
+ids.a.emit("playing");
+behind(2.2); tick();
+if (ids.a.playbackRate <= 1) throw new Error("baseline catch-up did not engage");
+ids.a.emit("waiting"); tick();
+if (ids.a.playbackRate !== 1) throw new Error("playback kept draining after an underrun");
 ids.a.paused = true; ids.a.playbackRate = 1;
 behind(5); tick();
 if (ids.a.playbackRate !== 1) throw new Error("paused audio was chased");
@@ -207,8 +253,8 @@ ids.a.playbackRate = 1;
 ids.a.buffered = { length: 2, start: (i) => [0, 900][i], end: (i) => [200, 1003][i] };
 ids.a.currentTime = 199.8;                 // playing the first range, a fifth of a second behind
 tick();
-if (ids.a.playbackRate !== 1)
-  throw new Error(`chased ${ids.a.playbackRate}x against a range it is not playing`);
+if (ids.a.playbackRate > 1)
+  throw new Error(`chased ${ids.a.playbackRate}x toward a range it is not playing`);
 ids.a.currentTime = 500;                   // stalled in the gap; neither range is live
 ids.a.playbackRate = 1;
 tick();
@@ -218,4 +264,4 @@ if (ids.a.playbackRate !== 1)
 eventSource.onerror();
 if (ids.connection.dataset.state !== "offline") throw new Error("disconnect was not surfaced");
 console.log("ok: listener UI connects, preserves history at the live edge, reveals lines as "
-  + "they are spoken, chases the live audio edge, escapes text, and toggles audio");
+  + "they are spoken, protects its audio buffer, escapes text, and toggles audio");

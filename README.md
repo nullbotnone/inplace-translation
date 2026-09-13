@@ -292,8 +292,12 @@ All of this lives in the console; the notes below are why each one is there.
   stuttering voice for the rest of the service.
 
   Listeners' phones add a delay of their own — a browser buffers a second or two while it
-  joins the stream, and since the stream never stops, nothing makes it up again. The listener
-  page watches that gap and plays 6% fast until it closes.
+  joins the stream. The listener page keeps at least 1.25 s of that audio as protection
+  against uneven wifi, and only plays 6% fast when it has more than that to spare. If playback
+  ever does run dry, the reserve grows by half a second (up to 3 s) for the rest of the service.
+  Below half a second it plays 3% slower to bridge a short delivery gap without stopping in
+  the middle of a sentence. Subtitle reveal follows the audio clock, so the cushion does not
+  put the words ahead of the voice.
 
   The translation is written far faster than it can be spoken — a sentence that takes five
   seconds to say is generated in a fraction of one — so a subtitle published the moment it
@@ -330,8 +334,11 @@ All of this lives in the console; the notes below are why each one is there.
   phone spreads the words across it, by the character in Chinese and by the word in English,
   clocked by the audio itself rather than by the wall: the page plays 6% fast whenever it is
   catching up to the live edge and stops dead while it rebuffers, and the words do both with
-  it. With audio off, the text appears whole as it arrives, and so does the backlog a phone
-  joining mid-sermon is sent.
+  it. A subtitle that wins the startup race now waits until the browser has a playable audio
+  range; after a stall it resumes at the word the voice has actually reached, rather than
+  restarting its reveal. Punctuation pauses and approximate English syllables keep the words
+  closer inside the sentence. With audio off, the text appears whole as it arrives, and so
+  does the backlog a phone joining mid-sermon is sent.
 
 ## What this is not
 
