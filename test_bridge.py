@@ -558,4 +558,36 @@ time.sleep(.5)
 assert subprocess.run(["ps", "-p", str(pid)], capture_output=True).returncode != 0, \
     "stop() left the pipeline process running"
 
+# Detection is clamped to the two languages we serve. Mandarin over a room mic is read as
+# Japanese often enough to matter, and whatever Whisper names is what the utterance gets
+# decoded as -- so the answer has to come out of our two whatever the other 97 scored.
+# The real modules are mlx, which the python running this test does not have.
+import types
+for name in ("speech_to_speech", "speech_to_speech.TTS", "speech_to_speech.TTS.kokoro_handler",
+             "speech_to_speech.cli", "mlx_audio", "mlx_audio.stt", "mlx_audio.stt.models",
+             "mlx_audio.stt.models.whisper", "mlx_audio.stt.models.whisper.whisper"):
+    sys.modules.setdefault(name, types.ModuleType(name))
+    parent, _, leaf = name.rpartition(".")
+    if parent:
+        setattr(sys.modules[parent], leaf, sys.modules[name])
+sys.modules["speech_to_speech.TTS.kokoro_handler"].WHISPER_LANGUAGE_TO_KOKORO_LANG = {"en": "a"}
+sys.modules["speech_to_speech.cli"].main = lambda: 0
+whisper_mod = sys.modules["mlx_audio.stt.models.whisper.whisper"]
+whisper_mod.Model = type("Model", (), {})
+import run_pipeline
+
+assert not sys.modules["speech_to_speech.TTS.kokoro_handler"].WHISPER_LANGUAGE_TO_KOKORO_LANG, \
+    "the voice would follow the language the mic heard, not the one it is speaking"
+assert whisper_mod.Model._detect_language is run_pipeline._detect_language, \
+    "whisper still picks from all 99 languages"
+assert run_pipeline.pick({"ja": .80, "zh": .15, "en": .05}) == "zh", "Japanese won the vote"
+assert run_pipeline.pick({"ja": .80, "en": .15, "zh": .05}) == "en"
+assert run_pipeline.pick({"ko": 1.0}) == "en", "nothing of ours scored; en is the fallback"
+# a language named on the command line is not a detection and must survive untouched
+assert run_pipeline._detect_language(None, None, language="zh") == "zh"
+
+# ... and the prompt says the same two, so a mis-heard utterance is still translated as one
+# of ours rather than left open to any language at all
+assert "English or Chinese" in bridge.base_prompt({**bridge.DEFAULTS, "source": "auto"})
+
 print("ok")

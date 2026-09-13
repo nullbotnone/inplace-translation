@@ -139,7 +139,9 @@ sessions:
   language sets what the recogniser listens for and needs a restart; the listeners' language
   only rewrites the prompt, so it takes effect on the next sentence. Pick **Detect
   automatically** only if the preacher genuinely switches mid-sermon — naming the language
-  outright gets better recognition on names and short phrases.
+  outright gets better recognition on names and short phrases. Detection is limited to these
+  two languages, so Mandarin that the recogniser would otherwise have called Japanese still
+  comes through as Chinese.
   There is no 简体/繁體 choice, because listeners are hearing audio and the distinction only
   exists in writing. It shows up in the subtitles, so a congregation that reads Traditional
   asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*

@@ -69,7 +69,11 @@ NEEDS_RESTART = {"model", "stt", "tts", "voice", "chat_size", "min_silence_ms", 
 # only change the prompt and a buffer. "source" sets the recognition language, a CLI flag.
 # "target" is live too -- until it drags the voice with it, which the pipeline loads at start.
 
-SPOKEN = {"en": "English", "zh": "Chinese", "auto": "whatever language the speaker uses"}
+# Two languages, everywhere: what the recogniser is allowed to hear (run_pipeline.py
+# clamps detection to these two), what the prompt says the speaker is using, and what
+# listeners can be sent to. "auto" names both rather than leaving it open, so a
+# mis-heard utterance still gets translated as one of ours instead of as Japanese.
+SPOKEN = {"en": "English", "zh": "Chinese", "auto": "English or Chinese"}
 TARGETS = {"en": "English", "zh": "Chinese"}
 # Listeners hear audio, where 简体 vs 繁體 does not exist. It only shows up in the
 # subtitles, so a church that wants Traditional asks for it in the glossary instead.
