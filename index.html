@@ -269,10 +269,9 @@
     else waitingLine.remove();
     log.scrollTop = log.scrollHeight;
   };
-  const addLine = ({ kind, text, at, secs, id }, voiceAt = null) => {
+  const addLine = ({ kind, text, at, secs, id, reply_to }, voiceAt = null) => {
     const showing = onScreen.get(id);
     if (showing) { showing.textContent = text; log.scrollTop = log.scrollHeight; return; }
-    awaiting = kind === "src";
     log.querySelector(".empty")?.remove();
     const safeKind = kind === "src" ? "src" : "out";
     const item = document.createElement("li"), meta = document.createElement("div"), body = document.createElement("p");
@@ -281,10 +280,24 @@
     body.className = safeKind;
     const spoken = !audio.paused && Number.isFinite(voiceAt) && secs > 0 && secs < MAX_REVEAL_S;
     if (spoken) revealOver(body, text, secs, voiceAt); else body.textContent = text;
-    item.append(meta, body); log.appendChild(item);
+    item.append(meta, body);
+    // Under the sentence it translates, not at the bottom. A translation is held back until
+    // the voice reaches it, and by then the preacher is a line or two further on, so
+    // appending it would file it under somebody else's words. The bridge says which heard
+    // line it answers; a line already scrolled off the end has nothing to sit under.
+    let after = reply_to === undefined ? null : onScreen.get(reply_to)?.parentNode;
+    // A turn is often several sentences, each spoken and published on its own, so that heard
+    // line may already have translations under it. They stack in the order they were said.
+    while (after?.nextSibling?.dataset.kind === "out") after = after.nextSibling;
+    if (after) log.insertBefore(item, after.nextSibling); else log.appendChild(item);
     if (id !== undefined) onScreen.set(id, body);
     waitingLine.remove();             // the cap counts lines of sermon, not the dots
     while (log.children.length > 40) { onScreen.delete(log.firstChild.lineId); log.firstChild.remove(); }
+    // The dots go under the newest line whenever that line is one that was heard: its
+    // translation is the one still to come. Since a translation files itself under its own
+    // sentence, above anything heard since, the last line on screen answers that by itself.
+    const newest = log.children[log.children.length - 1];
+    awaiting = !!newest && newest.dataset.kind === "src";
     showWaiting();                    // ... which go back under the newest line
     log.scrollTop = log.scrollHeight; // every new line returns listeners to the live edge
   };

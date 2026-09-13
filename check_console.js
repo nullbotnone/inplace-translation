@@ -22,6 +22,14 @@ function el(tag = "div") {
                  contains(c) { return this.on.has(c); } },
     setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; },
     appendChild(c) { c.parent = this; this.children.push(c); return c; },
+    // A real insert, not an append that ignores its reference node: a translation belongs
+    // under the line it translates, and an append could never show that going wrong.
+    insertBefore(c, before) {
+      c.parent = this;
+      const at = before ? this.children.indexOf(before) : -1;
+      if (at >= 0) this.children.splice(at, 0, c); else this.children.push(c);
+      return c;
+    },
     append(...c) { c.forEach((x) => { x.parent = this; }); this.children.push(...c); },
     querySelector(sel) {
       return sel === ".empty" ? this.children.find((kid) => kid.className === "empty") ?? null : null;
@@ -46,6 +54,11 @@ function el(tag = "div") {
     set(v) { text = v; e.writes++; },
   });
   Object.defineProperty(e, "firstChild", { get: () => e.children[0] ?? null });
+  Object.defineProperty(e, "parentNode", { get: () => e.parent ?? null });
+  Object.defineProperty(e, "nextSibling", { get: () => {
+    const kids = e.parent ? e.parent.children : [];
+    return kids[kids.indexOf(e) + 1] ?? null;
+  } });
   return e;
 }
 
@@ -119,7 +132,7 @@ const status = {
             model: "mlx-community/Qwen3-4B-Instruct-2507-4bit", stt: "mlx-audio-whisper",
             tts: "qwen3", voice: "zf_xiaoxiao", chat_size: 2, min_silence_ms: 64,
             lead_ms: 1500, engine: "cascade" },
-  listeners: 3, level: 0.42,
+  listeners: 3, level: 0.42, stoppable: true,
   url: "http://192.168.1.50:8000/",
 };
 for (const [name, data] of [["status", status], ["line", { kind: "out", text: "神爱世人", at: "10:31:02" }]]) {
@@ -204,6 +217,23 @@ listeners.status({ data: JSON.stringify(status) });
 if (cascadeOnly.some((l) => l.classList.contains("inert")))
   errors.push("switching back to the cascade left its own settings dimmed");
 
+// Stop has to be dead when there is nothing to stop, and the badge alone cannot say: a start
+// that failed reads "error" with the pipeline already terminated, while a microphone that
+// died mid-sermon reads "error" over a pipeline that is still up and still needs stopping.
+// The bridge answers that question itself, in `stoppable`.
+for (const [label, patch, dead] of [
+  ["a running pipeline", {}, false],
+  ["a stopped one", { state: "stopped", stoppable: false }, true],
+  ["a start that failed", { state: "error", stoppable: false }, true],
+  ["a start still loading", { state: "starting", stoppable: true }, false],
+  ["a microphone that died mid-sermon", { state: "error", stoppable: true }, false],
+]) {
+  listeners.status({ data: JSON.stringify({ ...status, ...patch }) });
+  if (byId.stopbtn.disabled !== dead)
+    errors.push(`Stop was ${byId.stopbtn.disabled ? "dead" : "live"} for ${label}`);
+}
+listeners.status({ data: JSON.stringify(status) });      // running again, for what follows
+
 // A Kokoro voice speaks one language, so the picker holds the target's voices and no
 // others. Qwen3-TTS has a single voice of its own: nothing to pick, so the control goes grey.
 const voiceOptions = () => (byId.voice.innerHTML.match(/value="[^"]+"/g) ?? [])
@@ -238,6 +268,18 @@ if (nthLast(2) === "死亡的原因") errors.push("the console left the unfinish
 listeners.line({ data: JSON.stringify({ kind: "out", text: "What causes death?", at: "10:41:03", id: 92 }) });
 if (nthLast(1) !== "What causes death?" || nthLast(2) !== "死亡的原因是什么呢")
   errors.push("the translation did not start its own line");
+
+// A translation is published when the voice reaches it, by which time the next sentence has
+// been heard already. It goes under the line it translates, not at the bottom.
+listeners.line({ data: JSON.stringify({ kind: "src", text: "死亡这个话题重大", at: "10:41:04", id: 93 }) });
+listeners.line({ data: JSON.stringify({ kind: "src", text: "他就不能有智慧的活着", at: "10:41:05", id: 94 }) });
+listeners.line({ data: JSON.stringify({ kind: "out", text: "The topic of death is significant", at: "10:41:06", id: 95, reply_to: 93 }) });
+if (nthLast(2) !== "The topic of death is significant" || nthLast(1) !== "他就不能有智慧的活着")
+  errors.push(`the console filed a translation under the wrong line: ${[nthLast(2), nthLast(1)]}`);
+// a turn spoken in two sentences keeps them in the order they were said
+listeners.line({ data: JSON.stringify({ kind: "out", text: "so some say", at: "10:41:07", id: 96, reply_to: 93 }) });
+if (nthLast(2) !== "so some say" || nthLast(3) !== "The topic of death is significant")
+  errors.push(`a turn's second sentence was filed out of order: ${[nthLast(3), nthLast(2), nthLast(1)]}`);
 
 // Clearing removes the rows and their id cache. Otherwise a later revision with the same id
 // updates a detached node and silently leaves the console showing "No transcript yet."

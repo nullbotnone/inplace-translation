@@ -319,7 +319,7 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
       <tr><td data-zh="语音识别" data-tw="語音辨識" data-en="Recognition"></td><td data-zh="Whisper · MLX，仅级联" data-tw="Whisper · MLX，僅級聯" data-en="Whisper · MLX, cascade only"></td></tr>
       <tr><td data-zh="翻译" data-tw="翻譯" data-en="Translation"></td><td data-zh="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地运行" data-tw="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地執行" data-en="Qwen3 4B, 8B or Qwen3.6 35B-A3B, quantised, running locally"></td></tr>
       <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，由一个模型同时听取与翻译；需要 64 GB，尚未在真实聚会中使用过" data-tw="Qwen3-Omni 30B-A3B，由一個模型同時聽取與翻譯；需要 64 GB，尚未在真實聚會中使用過" data-en="Qwen3-Omni 30B-A3B. One model both hears and translates. It needs 64 GB and has not yet run a live service"></td></tr>
-      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Piper，在 CPU 上运行，不与翻译抢 GPU；需要更多声音时改用 Kokoro，需要更佳音质时改用 Qwen3-TTS" data-tw="Piper，在 CPU 上執行，不與翻譯搶 GPU；需要更多聲音時改用 Kokoro，需要更佳音質時改用 Qwen3-TTS" data-en="Piper, on the CPU so it never waits for the translator's GPU; Kokoro for a wider choice of voices, Qwen3-TTS for the best quality"></td></tr>
+      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Kokoro，中英文各有多种声音；翻译繁忙时可改用 Piper，它在 CPU 上运行，不与翻译抢 GPU；需要更佳音质时改用 Qwen3-TTS" data-tw="Kokoro，中英文各有多種聲音；翻譯繁忙時可改用 Piper，它在 CPU 上執行，不與翻譯搶 GPU；需要更佳音質時改用 Qwen3-TTS" data-en="Kokoro, with a choice of Chinese and English voices; Piper when the translator is busy, since it runs on the CPU and never waits for the GPU; Qwen3-TTS for the best quality"></td></tr>
       <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉成 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, distributed by Python's standard-library HTTP server"></td></tr>
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>
@@ -338,9 +338,9 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
 
     <table class="spec">
       <tr><td>~/.cache/huggingface/hub</td>
-          <td data-zh="识别与翻译模型，约 4 GB，以及你另行选用的翻译模型或语音引擎"
-              data-tw="辨識與翻譯模型，約 4 GB，以及你另行選用的翻譯模型或語音引擎"
-              data-en="The recognition and translation models, about 4 GB, plus any translator or voice engine you have selected"></td></tr>
+          <td data-zh="识别、翻译与语音模型，约 4 GB，以及你另行选用的翻译模型或语音引擎"
+              data-tw="辨識、翻譯與語音模型，約 4 GB，以及你另行選用的翻譯模型或語音引擎"
+              data-en="The recognition, translation and voice models, about 4 GB, plus any translator or voice engine you have selected"></td></tr>
       <tr><td>~/.cache/torch/hub</td>
           <td data-zh="Silero 语音活动检测，数 MB"
               data-tw="Silero 語音活動偵測，數 MB"
@@ -360,19 +360,19 @@ pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
 hf cache ls                    <span class="c"># what is cached, and how big</span>
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/whisper-large-v3-turbo
+            model/mlx-community/whisper-large-v3-turbo \
+            model/mlx-community/Kokoro-82M-bf16
 
 <span class="c"># only if you switched the translator or voice engine, or ran the audio-in engine;
 # hf cache ls above shows which of these you actually have</span>
-hf cache rm model/mlx-community/Kokoro-82M-bf16 \
-            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
             model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit
 
 hf cache prune                 <span class="c"># half-finished downloads</span>
 
-<span class="c"># remove one Piper voice and its required config, if you no longer use it</span>
+<span class="c"># remove one Piper voice and its required config, if you switched to Piper and back</span>
 rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
       ~/.cache/piper-voices/zh_CN-huayan-medium.onnx.json</code></pre>
 

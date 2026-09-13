@@ -216,7 +216,10 @@ def load_config():
     cfg = dict(DEFAULTS)
     if CONFIG_PATH.exists():
         saved = json.loads(CONFIG_PATH.read_text())
-        saved["target"] = LEGACY_TARGET.get(saved.get("target"), saved.get("target"))
+        # Only if it has one: .get() on a config written without a target invents
+        # target=None, which is then rejected and complained about as if it had been typed.
+        if "target" in saved:
+            saved["target"] = LEGACY_TARGET.get(saved["target"], saved["target"])
         for key, value in saved.items():
             if key in DEFAULTS and valid(key, value):
                 cfg[key] = value
@@ -315,7 +318,7 @@ out_q = queue.Queue()             # translated PCM, chunked
 audio_lock = threading.Lock()
 queued_bytes = 0                  # handed to the pacer
 played_bytes = 0                  # handed on to the encoder, at wall-clock rate
-booked = []                       # [(at_byte, kind, text)] waiting for the voice to reach it
+booked = []                       # [(at_byte, subtitle args)] waiting for the voice to reach it
 speaking = threading.Event()      # a turn's audio is still arriving: silence now is a hole
                                   # in the middle of a word, not a pause between sentences
 ran_dry = threading.Event()       # ... and it happened during this turn
@@ -344,7 +347,7 @@ def queue_audio(chunk):
     return at
 
 
-def say_at(position, kind, text, secs=0.0):
+def say_at(position, kind, text, secs=0.0, reply_to=None):
     """Publish a subtitle when the voice reaches this position, or now if it is already past.
 
     Nothing queued means position == played_bytes, so the first sentence after a pause is
@@ -352,9 +355,9 @@ def say_at(position, kind, text, secs=0.0):
     """
     with audio_lock:
         if position > played_bytes:
-            booked.append((position, kind, text, secs))
+            booked.append((position, (kind, text, secs, reply_to)))
             return
-    subtitle(kind, text, secs)
+    subtitle(kind, text, secs, reply_to)
 
 
 def flush_booked():
@@ -362,8 +365,8 @@ def flush_booked():
     stopped. The audio is what there was too much of; the words still have to arrive."""
     with audio_lock:
         stranded, booked[:] = list(booked), []
-    for _, kind, text, secs in stranded:
-        subtitle(kind, text, secs)
+    for _, line in stranded:
+        subtitle(*line)
 
 
 def port_open(port):
@@ -413,16 +416,20 @@ def same_turn(was, now):
         None, was[:shared], now[:shared]).ratio() >= SAME_TURN
 
 
-def subtitle(kind, text, secs=0.0):
-    """kind is "src" (what the preacher said) or "out" (the translation).
+def subtitle(kind, text, secs=0.0, reply_to=None):
+    """kind is "src" (what the preacher said) or "out" (the translation). Returns its id.
 
     secs is how long the voice takes to say this line. A whole sentence put on screen at the
     moment its first word is spoken leaves its last word sitting there seconds early, which
     reads as the voice lagging the text; the phone spends this long revealing it instead.
+
+    reply_to is the heard line this one translates. A translation waits for the voice to
+    reach it, and by then the preacher is a sentence or two further on, so the screen cannot
+    work out the pairing from the order things arrive in -- only the bridge can.
     """
     global heard_turn, turns
     if not (text := text.strip()):
-        return
+        return None
     if kind == "src" and heard_turn and same_turn(heard_turn["text"], text):
         heard_turn["text"] = text                  # the backlog keeps the finished version
         line = dict(heard_turn)
@@ -433,12 +440,15 @@ def subtitle(kind, text, secs=0.0):
         turns += 1
         line = {"kind": kind, "text": text, "at": time.strftime("%H:%M:%S"),
                 "secs": round(secs, 2), "id": turns}
+        if reply_to is not None:
+            line["reply_to"] = reply_to
         recent.append(line)
         del recent[:-8]
         heard_turn = line if kind == "src" else None   # its translation ends the turn
     print(("  " if kind == "src" else "  -> ") + text, flush=True)
     subs.publish(f"data: {json.dumps(line)}\n\n".encode())
     events.publish(("line", line))
+    return line["id"]
 
 
 class Pipeline:
@@ -463,7 +473,16 @@ class Pipeline:
     def status(self):
         return {"state": self.state, "detail": self.detail, "config": self.cfg,
                 "listeners": audio.count(), "level": round(self.level, 3),
+                "stoppable": self.stoppable(),
                 "url": f"http://{lan_ip()}:{HTTP_PORT}/"}
+
+    def stoppable(self):
+        """Is there anything for Stop to do? "stopped" is not the only state where the
+        answer is no: a start that failed says "error" with every child already terminated,
+        and Stop against that does nothing. A start still loading its models has children
+        before it has the state to prove it, so it counts whatever is set so far."""
+        return self.state == "starting" or any(
+            child is not None for child in (self.proc, self.omni, self.ws, self.mic))
 
     def _set(self, state, detail=""):
         self.state, self.detail = state, detail
@@ -503,8 +522,10 @@ class Pipeline:
             threading.Thread(target=self._read_ws, daemon=True).start()
             self._set("running", "translating")
         except Exception as exc:
-            self._set("error", str(exc))
+            # Stopped first, then the error: stop() ends in "stopped", and what the operator
+            # needs on screen is why the start failed, not that it is no longer starting.
             self.stop()
+            self._set("error", str(exc))
 
     def _loading_message(self):
         """What the console says while the pipeline's models load."""
@@ -512,8 +533,8 @@ class Pipeline:
             # The translator model is not loaded in this mode -- the audio model is doing
             # that job -- so naming its download size here would just be wrong.
             return "loading the voice"
-        # Whisper and the 4B translator, which is all the default stack downloads now that
-        # the default voice is a 60 MB file outside the Hugging Face cache.
+        # Whisper, the 4B translator and Kokoro, which is the whole of the default stack:
+        # the voice is the small one of the three, at about a third of a gigabyte.
         size = "37.7 GB" if "35B" in self.cfg["model"] else "4 GB"
         return f"loading models (first run downloads ~{size})"
 
@@ -618,8 +639,7 @@ class Pipeline:
                     child.kill()
                 setattr(self, name, None)
         flush_booked()              # ... and a pipeline that stops owes its last words
-        if self.state != "error":
-            self._set("stopped", "")
+        self._set("stopped", "")
 
     def restart(self):
         self.extra_lead = 0         # a new pipeline is a new translator; let it prove itself
@@ -699,14 +719,23 @@ class Pipeline:
         # that silence lands inside words. So hold a lead of lead_ms and let the pacer play
         # out of that while the next gust is generated. Holding the whole turn instead is
         # gapless, but costs a whole turn of delay before the first word is heard.
-        # The lead is also pure delay, on every turn, so the default is small: Piper is the
-        # default voice now and it never waits for the GPU, so there are no gusts to cover.
+        # The lead is also pure delay, on every turn, so the default is a floor rather than
+        # an estimate: tune_lead() adds to it the first time a turn runs dry and hands it back
+        # over turns that do not, which is cheaper than charging every service for the worst
+        # one. Piper needs none of it -- it is on the CPU and has no gusts to cover.
         held = bytearray()
         # Where this turn's audio started in the stream, and where the turn whose text has
         # not arrived yet started. The pipeline sends a turn's transcript after the last of
         # its audio, so without this the subtitle would be booked a whole sentence late.
         turn_at = spoken_at = None
         spoken_len = 0
+        # The heard line a translation answers, carried alongside the position the same way
+        # and for the same reason: the transcript arrives after the turn's audio, and by then
+        # the recogniser may already have finished the next sentence. Pinned when the turn's
+        # first audio arrives, which is after its own transcription and before the next one.
+        # Not read off the global heard_turn either -- the pacer clears that as it publishes
+        # translations, seconds after this thread booked them.
+        heard_id = turn_heard = spoken_heard = None
         try:
             for msg in self.ws:
                 ev = json.loads(msg)
@@ -718,13 +747,15 @@ class Pipeline:
                     # mid-sermon and hear the difference on the next sentence.
                     if len(held) >= (self.cfg["lead_ms"] + self.extra_lead) * RATE * 2 // 1000:
                         at = queue_audio(bytes(held))
-                        turn_at = at if turn_at is None else turn_at
+                        if turn_at is None:
+                            turn_at, turn_heard = at, heard_id
                         held.clear()
                         speaking.set()
                 elif t.endswith("audio.done") and "transcript" not in t:
                     if held:
                         at = queue_audio(bytes(held))
-                        turn_at = at if turn_at is None else turn_at
+                        if turn_at is None:
+                            turn_at, turn_heard = at, heard_id
                         held.clear()
                     # ... and how much audio that turn came to, so the phone knows how long
                     # the voice will take to say the line it is about to be sent.
@@ -732,13 +763,14 @@ class Pipeline:
                     # audio starts at position 0, and 0 is where a sermon begins.
                     spoken_len = 0 if turn_at is None else queued_bytes - turn_at
                     spoken_at, turn_at = turn_at, None
+                    spoken_heard, turn_heard = turn_heard, None
                     speaking.clear()
                     self.tune_lead()
                 elif "input_audio_transcription" in t and t.endswith((".completed", ".done")):
                     # What the preacher said goes out as soon as it is recognised: it is not
                     # waiting on a voice, and it is the first sign on screen that the room is
                     # being heard at all. Only the translation waits for the voice reading it.
-                    subtitle("src", ev.get("transcript", ""))
+                    heard_id = subtitle("src", ev.get("transcript", "")) or heard_id
                 elif t.endswith("audio_transcript.done"):
                     # A turn's text arrives after the last of its audio -- measured, not
                     # assumed: 4.6 s of speech generated in 0.3 s, then audio.done, then this
@@ -747,9 +779,10 @@ class Pipeline:
                     # would trail by a whole sentence. So book it against where that
                     # sentence's audio began.
                     at = spoken_at if spoken_at is not None else queued_bytes
-                    say_at(at + DELIVERY_LAG_MS * RATE * 2 // 1000,
-                           "out", ev.get("transcript", ""), spoken_len / (RATE * 2))
-                    spoken_at, spoken_len = None, 0
+                    say_at(at + DELIVERY_LAG_MS * RATE * 2 // 1000, "out",
+                           ev.get("transcript", ""), spoken_len / (RATE * 2),
+                           spoken_heard if spoken_heard is not None else heard_id)
+                    spoken_at, spoken_len, spoken_heard = None, 0, None
         except Exception as exc:
             if self.state == "running":
                 self._set("error", f"lost the pipeline: {exc}")
@@ -983,8 +1016,8 @@ def pacer(stdin, stop=None):
                 due = [b for b in booked if b[0] <= played_bytes]
                 if due:
                     booked[:] = [b for b in booked if b[0] > played_bytes]
-            for _, kind, text, secs in due:
-                subtitle(kind, text, secs)
+            for _, line in due:
+                subtitle(*line)
         else:
             chunk = silence
             # The voice is generated ahead of being played, so an empty queue mid-turn means

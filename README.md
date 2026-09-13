@@ -10,8 +10,8 @@ mic ─▶ bridge.py ──┼─▶ /subs (subtitles) ─────┴─▶ 
        │           └─▶ /admin ──────────────────▶ you, on this Mac only
        │
        └─ spawns: run_pipeline.py (speech-to-speech serve)
-                    cascade:  VAD → Whisper → translator → Piper
-                    omni:     VAD → Qwen3-Omni ─────────→ Piper
+                    cascade:  VAD → Whisper → translator → Kokoro
+                    omni:     VAD → Qwen3-Omni ─────────→ Kokoro
 ```
 
 `bridge.py` starts the pipeline, so there is one thing to run and one page to drive it.
@@ -281,8 +281,9 @@ All of this lives in the console; the notes below are why each one is there.
 - **Voice buffer** — an MLX voice and the translator take turns on the one GPU, so the voice
   arrives in gusts. The bridge buffers this much of it before playing, which is heard as
   delay rather than as stuttering. It is also pure delay on every turn, so the default is
-  400 ms: Piper does not touch the GPU and has no gusts to cover. Raise it if the audio chops
-  under Kokoro or Qwen3-TTS, lower it if the voice lags behind the preacher; tune it by ear.
+  400 ms, which is a floor rather than an estimate: a service that never needs more never
+  pays for it, and one that does is given it. Raise it if the audio chops, lower it if the
+  voice lags behind the preacher; tune it by ear.
   You do not have to catch it by ear, and you do not have to fix it by hand. A turn is
   several sentences, and the translator writes each one only as the one before it is being
   spoken; when it takes longer than the buffer holds, the voice runs out in the middle of the
@@ -293,8 +294,9 @@ All of this lives in the console; the notes below are why each one is there.
 
   Listeners' phones add a delay of their own — a browser buffers a second or two while it
   joins the stream. The listener page keeps at least 1.25 s of that audio as protection
-  against uneven wifi, and only plays 6% fast when it has more than that to spare. If playback
-  ever does run dry, the reserve grows by half a second (up to 3 s) for the rest of the service.
+  against uneven wifi, and only speeds up when it has more than that to spare — 6% fast, or
+  10% when it is more than two seconds clear of the reserve. If playback ever does run dry,
+  the reserve grows by half a second (up to 3 s) for the rest of the service.
   Below half a second it plays 3% slower to bridge a short delivery gap without stopping in
   the middle of a sentence. Subtitle reveal follows the audio clock, so the cushion does not
   put the words ahead of the voice.
@@ -309,8 +311,12 @@ All of this lives in the console; the notes below are why each one is there.
   to wait for, so the first sentence after a pause is not held back at all.
 
   What the preacher said is not held at all — nothing is reading it out, and it is the first
-  sign on screen that the room is being heard. Only the translation waits for its voice, so
-  a heard line can sit above the translation of the sentence before it.
+  sign on screen that the room is being heard. Only the translation waits for its voice, and
+  by the time it arrives the preacher is a sentence or two further on. Each line therefore
+  carries the heard line it translates, and the page files it directly under that line rather
+  than at the bottom: the pair stays together, and the newest heard sentence keeps the three
+  dots until its own translation lands. A turn spoken as several sentences stacks them under
+  it in the order they were said.
 
   A heard line also grows. Whisper does not transcribe a turn once: it transcribes what it
   has so far, then the whole thing again as the preacher keeps going, correcting earlier
@@ -381,7 +387,7 @@ in the same cache even though it runs from `.venv-omni`.
 
 | | |
 |---|---|
-| `~/.cache/huggingface/hub` | recognition and translation models, ~4 GB, plus any translator or voice engine you switched to |
+| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~4 GB, plus any translator or voice engine you switched to |
 | `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
 | `~/.cache/piper-voices` | Piper's voices, ~60 MB each, downloaded the first time one is selected |
 
@@ -392,12 +398,12 @@ source .venv/bin/activate
 hf cache ls                    # what is cached, and how big
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/whisper-large-v3-turbo
+            model/mlx-community/whisper-large-v3-turbo \
+            model/mlx-community/Kokoro-82M-bf16
 
 # only if you switched the translator or the voice engine in the console, or ran
 # a version that used Smart Turn; hf cache ls above shows which you actually have
-hf cache rm model/mlx-community/Kokoro-82M-bf16 \
-            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
             model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit \
@@ -405,7 +411,7 @@ hf cache rm model/mlx-community/Kokoro-82M-bf16 \
 
 hf cache prune                 # half-finished downloads
 
-# remove one Piper voice and its required config, if you no longer use it
+# remove one Piper voice and its required config, if you switched to Piper and back
 rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
       ~/.cache/piper-voices/zh_CN-huayan-medium.onnx.json
 ```

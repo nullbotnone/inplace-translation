@@ -293,7 +293,7 @@
                 data-zh="Qwen3 4B — 需 16 GB" data-tw="Qwen3 4B — 需 16 GB"
                 data-en="Qwen3 4B — requires 16 GB"></option>
         <option value="mlx-community/Qwen3-8B-4bit"
-                data-zh="Qwen3 8B — 品质较佳，需 24 GB" data-tw="Qwen3 8B — 品质较佳，需 24 GB"
+                data-zh="Qwen3 8B — 品质较佳，需 24 GB" data-tw="Qwen3 8B — 品質較佳，需 24 GB"
                 data-en="Qwen3 8B — higher quality; requires 24 GB"></option>
         <option value="mlx-community/Qwen3.6-35B-A3B-8bit"
                 data-zh="Qwen3.6 35B — 圣经书卷名最准确，需 64 GB"
@@ -545,12 +545,13 @@ function paint() {
   if (linkLost) { $("state").dataset.s = "error"; $("statetext").textContent = t("nolink"); }
   else if (s) { $("state").dataset.s = s.state; $("statetext").textContent = t(s.state); }
 
-  // Before the first status there is nothing to command, so no button is live -- and the
-  // state a button would undo has to be known: Stop on a stopped pipeline does nothing.
+  // Before the first status there is nothing to command, so no button is live. Stop follows
+  // the server's own answer to "is there anything to stop": a start that failed says "error"
+  // with the pipeline already gone, and pressing Stop on that does nothing at all.
   const state = s ? s.state : "stopped";
   const dead = linkLost || !s || busyAction !== null;
   $("startbtn").disabled = dead || state === "running" || state === "starting";
-  $("stopbtn").disabled = dead || state === "stopped";
+  $("stopbtn").disabled = dead || !s.stoppable;
   $("restartbtn").disabled = dead || state === "starting";
   ["startbtn", "stopbtn", "restartbtn"].forEach((id) =>
     $(id).setAttribute("aria-busy", String(busyAction === id)));
@@ -791,6 +792,7 @@ function addLine(line) {
   }
   log.querySelector(".empty")?.remove();
   const li = document.createElement("li");
+  li.dataset.kind = line.kind;        // which rows a following translation may stack under
   const tag = document.createElement("div");
   tag.className = "t";
   // data- attributes, so switching language relabels lines already on screen
@@ -805,7 +807,14 @@ function addLine(line) {
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   li.append(tag, body);
   li.lineId = line.id;
-  log.appendChild(li);
+  // Under the sentence it translates. A translation is published when the voice reaches it,
+  // by which time the preacher is a line or two further on, so appending it would file it
+  // under somebody else's words. The bridge names the heard line each one answers.
+  let after = line.reply_to === undefined ? null : onScreen.get(line.reply_to)?.parentNode;
+  // A turn is often several sentences, each published as its own line, so stack them under
+  // the heard line in the order they were said rather than newest first.
+  while (after?.nextSibling?.dataset.kind === "out") after = after.nextSibling;
+  if (after) log.insertBefore(li, after.nextSibling); else log.appendChild(li);
   if (line.id !== undefined) onScreen.set(line.id, body);
   while (log.children.length > 30) { onScreen.delete(log.firstChild.lineId); log.firstChild.remove(); }
   if (atBottom) log.scrollTop = log.scrollHeight;

@@ -32,9 +32,13 @@ def run_pacer(seconds=0.3):
 bridge.recent.clear()
 p_ws = bridge.Pipeline()
 p_ws.ws = [json.dumps(e) for e in (
+    {"type": "conversation.item.input_audio_transcription.completed", "transcript": "你好"},
     {"type": "response.output_audio.delta", "delta": b64(b"\1\2")},
     {"type": "response.output_audio.delta", "delta": b64(b"\3\4")},
     {"type": "response.output_audio.done"},
+    # the next sentence is recognised before this turn's transcript arrives -- a turn's text
+    # comes after the last of its audio, and the recogniser does not wait for it
+    {"type": "conversation.item.input_audio_transcription.completed", "transcript": "再见"},
     {"type": "response.output_audio_transcript.done", "transcript": "hi"},
     {"type": "response.output_audio.delta", "delta": b64(b"\5\6")},
 )]
@@ -54,12 +58,18 @@ assert p_dead.state == "error", "a closed pipeline socket left the bridge claimi
 assert "restart" in p_dead.detail, f"the error does not say what to do: {p_dead.detail!r}"
 # the line is booked against the start of its own audio, with the length of it: the very
 # first turn of a session starts at position 0, which is a position like any other
-at, kind, text, secs = booked_first[0]
+at, kind, text, secs, reply_to = booked_first[0]
 # the audio starts at 0 and the line is booked a delivery lag later: the listener's socket
 # does not see a byte at the moment the encoder is handed it
 lag = bridge.DELIVERY_LAG_MS * bridge.RATE * 2 // 1000
 assert (at, kind, text) == (lag, "out", "hi"), f"booked {booked_first[0]}"
 assert secs == 4 / (bridge.RATE * 2), f"the voice's own length was lost: {secs}"
+# ... and against the line it translates, so the screen can show the two together. A
+# translation waits for the voice, by which time the preacher is a sentence or two further
+# on, so the pairing has to be taken here and not from whatever was heard most recently.
+heard = [l for l in bridge.recent if l["kind"] == "src"]
+assert reply_to == heard[0]["id"], \
+    f"translated 你好 but answered {reply_to}, out of {[(l['id'], l['text']) for l in heard]}"
 
 # ... but only up to the lead: a long turn starts playing while the rest is still being
 # spoken, instead of the listener waiting out the whole turn first
@@ -722,6 +732,24 @@ p4.stop()
 time.sleep(.5)
 assert subprocess.run(["ps", "-p", str(pid)], capture_output=True).returncode != 0, \
     "stop() left the pipeline process running"
+assert p4.state == "stopped", f"stopping left the console saying {p4.state!r}"
+# An error the operator then stops is over: the pipeline is down and the badge has to say so,
+# or "error" and its stale detail sit there for the rest of the service.
+p4.state = "error"
+p4.stop()
+assert p4.state == "stopped", "Stop after an error left the error on screen"
+
+# ... and Stop itself is offered only when there is something to stop. "stopped" is not the
+# only state that means there is not: a start that fails ends in "error" with every child
+# already terminated, while a microphone that dies leaves the pipeline up and worth stopping.
+p5 = bridge.Pipeline()
+assert not p5.stoppable(), "a pipeline that never started offered Stop"
+p5.state = "starting"
+assert p5.stoppable(), "a start still loading its models could not be cancelled"
+p5.state = "error"                      # what a start that failed leaves behind
+assert not p5.stoppable(), "a failed start offered a Stop that does nothing"
+p5.proc = object()                      # what a mic that died mid-sermon leaves behind
+assert p5.stoppable(), "an error over a running pipeline hid Stop"
 
 # Detection is clamped to the two languages we serve. Mandarin over a room mic is read as
 # Japanese often enough to matter, and whatever Whisper names is what the utterance gets

@@ -17,6 +17,15 @@ function el(tag = "div") {
     emit(name) { listeners[name]?.(); },
     append(...kids) { kids.forEach((kid) => (kid.parent = this)); this.children.push(...kids); },
     appendChild(kid) { kid.parent = this; this.children.push(kid); return kid; },
+    // A translation goes under the line it translates, so the page needs a real insert: with
+    // an appendChild that ignores its reference node this check could never see the order go
+    // wrong. A missing reference appends, the way the DOM does.
+    insertBefore(kid, before) {
+      kid.parent = this;
+      const at = before ? this.children.indexOf(before) : -1;
+      if (at >= 0) this.children.splice(at, 0, kid); else this.children.push(kid);
+      return kid;
+    },
     // A node that is not in the tree removes to nothing, the way the DOM does; splicing at
     // an index of -1 would take the last child with it instead.
     remove() {
@@ -34,6 +43,11 @@ function el(tag = "div") {
     currentTime: 0, playbackRate: 1,
   };
   Object.defineProperty(node, "firstChild", { get: () => node.children[0] ?? null });
+  Object.defineProperty(node, "parentNode", { get: () => node.parent ?? null });
+  Object.defineProperty(node, "nextSibling", { get: () => {
+    const kids = node.parent ? node.parent.children : [];
+    return kids[kids.indexOf(node) + 1] ?? null;
+  } });
   return node;
 }
 
@@ -168,6 +182,27 @@ eventSource.onmessage({ data: JSON.stringify({ kind: "src", text: "下一句", a
 eventSource.onmessage({ data: JSON.stringify({ kind: "out", text: "The next one", at: "10:41:15", id: 84 }) });
 tick();
 if (dots()) throw new Error("an untranslated turn left the dots spinning");
+
+// A translation waits for the voice, so by the time it arrives the preacher's next sentence
+// has already been heard and gone up. It still belongs under the sentence it translates --
+// the bridge names which one -- rather than at the bottom under somebody else's words.
+const heard = (text, at, id) =>
+  eventSource.onmessage({ data: JSON.stringify({ kind: "src", text, at, id }) });
+const translated = (text, at, id, reply_to) =>
+  eventSource.onmessage({ data: JSON.stringify({ kind: "out", text, at, id, reply_to }) });
+heard("死亡这个话题重大", "14:30:55", 90);
+heard("他就不能有智慧的活着", "14:31:00", 91);
+translated("The topic of death is significant", "14:31:01", 92, 90);
+tick();
+if (nthLast(2) !== "The topic of death is significant" || nthLast(1) !== "他就不能有智慧的活着")
+  throw new Error(`the translation was filed under the wrong line: ${[nthLast(3), nthLast(2), nthLast(1)]}`);
+// ... and the sentence still waiting for its own voice keeps the dots
+if (!dots()) throw new Error("the dots left a heard line whose translation had not arrived");
+translated("they cannot live wisely.", "14:31:07", 93, 91);
+tick();
+if (nthLast(1) !== "they cannot live wisely.")
+  throw new Error("the newest translation did not land under the newest heard line");
+if (dots()) throw new Error("the dots outlived the translation they were waiting for");
 
 // A line is revealed as the voice says it, on the voice's own clock: this page plays 6%
 // fast while it catches up to the live edge and stops dead while a phone rebuffers, and the
