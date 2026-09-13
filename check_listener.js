@@ -28,6 +28,7 @@ function el(tag = "div") {
     },
     play() { this.paused = false; return Promise.resolve(); },
     pause() { this.paused = true; },
+    currentTime: 0, playbackRate: 1,
   };
   Object.defineProperty(node, "firstChild", { get: () => node.children[0] ?? null });
   return node;
@@ -37,9 +38,11 @@ const ids = Object.fromEntries(["a", "b", "log", "buttonText", "playHint", "conn
   "connectionText"].map((id) => [id, el(id === "a" ? "audio" : "div")]));
 const empty = el("li"); empty.className = "empty"; ids.log.append(empty);
 let eventSource;
+const ticks = [];
 const sandbox = {
   document: { getElementById: (id) => ids[id], createElement: (tag) => el(tag) },
   EventSource: class { constructor() { eventSource = this; } },
+  setInterval: (fn) => ticks.push(fn),
   setTimeout, clearTimeout, console,
 };
 vm.createContext(sandbox);
@@ -70,6 +73,26 @@ if (ids.b.dataset.mode !== "playing") throw new Error("play button did not show 
 ids.b.onclick();
 if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could not be paused");
 
+// Whatever the phone buffered on the way in never drains by itself: the stream carries
+// silence between sentences, so the playhead keeps its distance from the live edge and the
+// voice lags the subtitle of the same sentence forever. Play slightly fast until it closes.
+const tick = () => ticks.forEach((fn) => fn());
+const behind = (seconds) => {
+  ids.a.currentTime = 100;
+  ids.a.buffered = { length: 1, end: () => 100 + seconds };
+};
+ids.a.paused = false;
+behind(1.2); tick();
+if (ids.a.playbackRate <= 1) throw new Error("a phone a second behind never caught up");
+behind(3); tick();
+if (ids.a.playbackRate < 1.1) throw new Error("three seconds behind was chased no harder");
+behind(0.3); tick();
+if (ids.a.playbackRate !== 1) throw new Error("playback stayed fast after catching up");
+ids.a.paused = true; ids.a.playbackRate = 1;
+behind(5); tick();
+if (ids.a.playbackRate !== 1) throw new Error("paused audio was chased");
+
 eventSource.onerror();
 if (ids.connection.dataset.state !== "offline") throw new Error("disconnect was not surfaced");
-console.log("ok: listener UI connects, preserves history at the live edge, escapes text, and toggles audio");
+console.log("ok: listener UI connects, preserves history at the live edge, chases the live "
+  + "audio edge, escapes text, and toggles audio");

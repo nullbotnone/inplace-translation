@@ -63,7 +63,7 @@ VOICES = {
 }
 DEFAULT_VOICE = {
     "kokoro": {"zh": "zm_yunyang", "en": "am_michael"},
-    "piper": {"zh": "zh_CN-huayan-medium", "en": "en_US-ryan-medium"},
+    "piper": {"zh": "zh_CN-huayan-medium", "en": "en_US-hfc_male-medium"},
 }
 
 DEFAULTS = {
@@ -76,7 +76,7 @@ DEFAULTS = {
     "voice": DEFAULT_VOICE["piper"]["zh"],                       # must match "tts" and "target"
     "chat_size": 2,
     "min_silence_ms": 64,
-    "lead_ms": 1500,                                             # voice buffered before it plays
+    "lead_ms": 400,                                              # voice buffered before it plays
     "engine": "cascade",                                         # cascade | omni
 }
 NEEDS_RESTART = {"model", "stt", "tts", "voice", "chat_size", "min_silence_ms", "source",
@@ -595,12 +595,14 @@ class Pipeline:
                 self._set("error", f"the microphone stopped: {exc}")
 
     def _read_ws(self):
-        # The translator and the voice share one GPU lock -- Apple Silicon has one GPU and
+        # An MLX voice and the translator share one GPU lock -- Apple Silicon has one GPU and
         # mlx serialises it -- so a turn's audio arrives in gusts: the TTS stalls every time
         # the language model takes the lock to write the next sentence. Played as it lands,
         # that silence lands inside words. So hold a lead of lead_ms and let the pacer play
         # out of that while the next gust is generated. Holding the whole turn instead is
         # gapless, but costs a whole turn of delay before the first word is heard.
+        # The lead is also pure delay, on every turn, so the default is small: Piper is the
+        # default voice now and it never waits for the GPU, so there are no gusts to cover.
         held = bytearray()
         try:
             for msg in self.ws:
@@ -853,6 +855,10 @@ def heartbeat():
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    # One mp3 frame is 256 bytes, and Nagle holds a write that small until the last one is
+    # acknowledged -- a round trip of church wifi added to every frame of a live stream, for
+    # a saving of nothing. The base class has the switch; it is off by default.
+    disable_nagle_algorithm = True
 
     # ponytail: the console is localhost-only, so nobody on the church wifi can stop the
     # broadcast. If an operator ever needs it from a tablet, add a token to the URL.

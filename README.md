@@ -271,10 +271,16 @@ All of this lives in the console; the notes below are why each one is there.
   American voice handed Chinese text reads it as the words "Chinese letter", once per
   character. Changing what listeners hear therefore changes the voice too, and needs a
   restart — the prompt can change mid-service, a loaded voice cannot.
-- **Voice buffer** — the model and the voice take turns on the one GPU, so the voice arrives
-  in gusts. The bridge buffers this much of it before playing, which is heard as delay rather
-  than as stuttering. Raise it if the audio chops, lower it if the voice lags too far behind
-  the preacher. 1.5 s is a starting point, not a right answer; tune it by ear in your room.
+- **Voice buffer** — an MLX voice and the translator take turns on the one GPU, so the voice
+  arrives in gusts. The bridge buffers this much of it before playing, which is heard as
+  delay rather than as stuttering. It is also pure delay on every turn, so the default is
+  400 ms: Piper does not touch the GPU and has no gusts to cover. Raise it if the audio chops
+  under Kokoro or Qwen3-TTS, lower it if the voice lags behind the preacher; tune it by ear.
+
+  Listeners' phones add a delay of their own — a browser buffers a second or two while it
+  joins the stream, and since the stream never stops, nothing makes it up again. The listener
+  page watches that gap and plays 6% fast until it closes, which is why the voice now tracks
+  the subtitle of the same sentence instead of trailing it for the rest of the service.
 
 ## What this is not
 

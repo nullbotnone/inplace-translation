@@ -116,6 +116,21 @@
     retry = setTimeout(() => { retry = null; listen().catch(() => { wantsAudio = false;
       playback("error", "Try audio again · 重试音频", "Audio is unavailable · 暂时无法播放语音"); }); }, 1000);
   }));
+  // The stream never stops -- silence goes out between sentences -- so whatever a phone
+  // buffered while it was joining, it stays that far behind for the rest of the service, and
+  // every rebuffer adds more. Nothing drains it on its own, which is why the voice can run a
+  // second or two behind the subtitle of the same sentence. So measure the gap to the newest
+  // audio we hold and play slightly fast until it closes: the browser corrects the pitch, so
+  // 6% is inaudible on speech and clears a second of lag in about twenty.
+  const CHASE_ABOVE_S = 0.8, CAUGHT_UP_S = 0.4;
+  const chaseLiveEdge = () => {
+    const held = audio.buffered;
+    if (audio.paused || !held || !held.length) return;
+    const behind = held.end(held.length - 1) - audio.currentTime;
+    if (behind > CHASE_ABOVE_S) audio.playbackRate = behind > 2 ? 1.1 : 1.06;
+    else if (behind <= CAUGHT_UP_S) audio.playbackRate = 1;
+  };
+  setInterval(chaseLiveEdge, 1000);
   const connection = (state, text) => { $("connection").dataset.state = state; $("connectionText").textContent = text; };
   const addLine = ({ kind, text, at }) => {
     log.querySelector(".empty")?.remove();

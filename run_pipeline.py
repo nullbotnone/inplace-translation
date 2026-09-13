@@ -134,8 +134,8 @@ class PiperTTSHandlerArguments:
     builds them from the field names and strips the prefix again on the way to setup()."""
 
     piper_voice: str = field(
-        default="en_US-ryan-medium",
-        metadata={"help": "Piper voice, e.g. 'en_US-ryan-medium' or 'zh_CN-huayan-medium'. "
+        default="en_US-hfc_male-medium",
+        metadata={"help": "Piper voice, e.g. 'en_US-hfc_male-medium' or 'zh_CN-huayan-medium'. "
                           "Downloaded on first use. A voice speaks the language in its name."},
     )
     piper_speed: float = field(
