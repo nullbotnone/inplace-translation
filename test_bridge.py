@@ -333,10 +333,16 @@ p1.cfg = dict(bridge.DEFAULTS)
 
 assert p1.update({"source": "auto"}) is True, "spoken language should need a restart"
 
-# a voice speaks one language. Sending listeners to the other one carries the voice with it,
-# and a voice is loaded at startup -- so that target change, unlike a plain one, restarts.
-assert p1.update({"target": "en"}) is True, "an en target cannot keep a Chinese voice"
+# A voice speaks one language. Sending listeners to the other one automatically restarts a
+# running pipeline, so English text can never be handed to its already-loaded Chinese voice.
+p1.state = "running"
+p1.apply_instructions = lambda: None
+restarted = threading.Event()
+p1.restart = restarted.set
+assert p1.update({"target": "en"}) is False, "the target change should restart automatically"
+assert restarted.wait(1), "changing output language left the wrong voice running"
 assert p1.cfg["voice"] == bridge.DEFAULT_VOICE["en"], f"kept {p1.cfg['voice']}"
+p1.state = "stopped"
 # ... any other English voice, since the target change already left it on the default one
 assert p1.update({"voice": "af_heart"}) is True, "a voice is loaded when the pipeline starts"
 assert p1.update({"target": "zh"}) is True and p1.cfg["voice"] == bridge.DEFAULT_VOICE["zh"]

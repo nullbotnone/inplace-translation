@@ -619,7 +619,15 @@ class Pipeline:
         if "target" in changed and self.state == "running":
             self.apply_instructions()
         events.publish(("status", self.status()))
-        return bool(NEEDS_RESTART & set(changed))
+        restart_required = bool(NEEDS_RESTART & set(changed))
+        # A target, Kokoro voice, or voice engine change leaves a running pipeline speaking
+        # with a model that cannot pronounce its new output. Restart it immediately instead
+        # of briefly sending English text to the already-loaded Chinese phonemiser and asking
+        # the operator to notice and press Restart separately.
+        voice_restart = self.state == "running" and bool({"target", "voice", "tts"} & set(changed))
+        if voice_restart:
+            threading.Thread(target=self.restart, daemon=True).start()
+        return restart_required and not voice_restart
 
 
 pipeline = Pipeline()

@@ -417,7 +417,7 @@ const STR = {
         autolang:"讲员语言设为自动侦测。以{b}讲道的内容将不会翻译，听众端为静音。请指定讲道所用语言。",
         heard:"听到", translated:"翻译",
         female:"女声", male:"男声",
-        voicehint:"只提供听众语言的声音。更改后需重启。",
+        voicehint:"只提供听众语言的声音。更改语言或声音后会自动重启。",
         qwen3voice:"Qwen3-TTS 只有一种声音，无法选择。" },
   tw: { stopped:"已停止", starting:"啟動中", running:"執行中", error:"出錯", nolink:"控制台連線中斷",
         sysdefault:"系統預設", rescanned:"裝置已重新掃描", omniignores:"Qwen3-Omni 直接處理語音，講員語言、語言模型與上下文設定均不適用。", omnilang:"聽眾聽到{b}。講道語言由模型自動偵測。", saved:"已儲存", glossarysaved:"詞表已儲存", exampleadded:"範例已插入。請依貴會需要修改後儲存。",
@@ -430,7 +430,7 @@ const STR = {
         autolang:"講員語言設為自動偵測。以{b}講道的內容將不會翻譯，聽眾端為靜音。請指定講道所用語言。",
         heard:"聽到", translated:"翻譯",
         female:"女聲", male:"男聲",
-        voicehint:"只提供聽眾語言的聲音。更改後需重啟。",
+        voicehint:"只提供聽眾語言的聲音。更改語言或聲音後會自動重啟。",
         qwen3voice:"Qwen3-TTS 只有一種聲音，無法選擇。" },
   en: { stopped:"stopped", starting:"starting", running:"running", error:"error",
         nolink:"console disconnected", sysdefault:"System default", rescanned:"Device list refreshed", omniignores:"Qwen3-Omni processes the audio directly. The spoken language, language model and context settings do not apply.", omnilang:"Listeners hear {b}. The audio model detects the spoken language automatically.", saved:"Saved",
@@ -445,7 +445,7 @@ const STR = {
         autolang:"Source is set to automatic. Anything preached in {b} is left untranslated and listeners hear silence. Select the language of the sermon.",
         heard:"HEARD", translated:"TRANSLATED",
         female:"female", male:"male",
-        voicehint:"Only voices that speak the listeners' language are offered. Takes effect after restarting.",
+        voicehint:"Only voices that speak the listeners' language are offered. Changing the language or voice restarts automatically.",
         qwen3voice:"Qwen3-TTS has one voice; there is nothing to choose." },
 };
 
@@ -779,7 +779,11 @@ function addLine(line) {
 }
 
 const es = new EventSource("/api/events");
-es.addEventListener("status", (e) => { linkLost = false; current = JSON.parse(e.data); paint(); });
+es.addEventListener("status", (e) => {
+  linkLost = false; current = JSON.parse(e.data);
+  if (current.state === "starting") restartPending = false;
+  paint();
+});
 es.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
 es.onopen = () => { linkLost = false; paint(); };
 es.onerror = () => { linkLost = true; paint(); };
