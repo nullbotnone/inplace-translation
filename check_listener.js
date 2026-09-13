@@ -60,7 +60,11 @@ let eventSource;
 const ticks = [];
 const sandbox = {
   document: { getElementById: (id) => ids[id], createElement: (tag) => el(tag) },
-  EventSource: class { constructor() { eventSource = this; } },
+  EventSource: class {
+    constructor(url) { this.url = url; this.listeners = {}; eventSource = this; }
+    addEventListener(name, fn) { this.listeners[name] = fn; }
+    emit(name, data) { this.listeners[name]?.({ data: JSON.stringify(data) }); }
+  },
   setInterval: (fn) => ticks.push(fn) - 1,
   clearInterval: (id) => { ticks[id] = null; },
   setTimeout, clearTimeout, console,
@@ -99,8 +103,8 @@ if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could
 
 const tick = () => ticks.forEach((fn) => fn && fn());   // every interval the page set
 const latest = () => lines().at(-1).children[1].textContent;   // the transcript is capped
-const say = (kind, text, secs) =>
-  eventSource.onmessage({ data: JSON.stringify({ kind, text, at: "10:41:00", secs }) });
+const say = (kind, text, secs, voice_at) =>
+  eventSource.onmessage({ data: JSON.stringify({ kind, text, at: "10:41:00", secs, voice_at }) });
 
 // If the subtitle socket wins the race at startup, there is no buffered edge yet. The text
 // must wait for one instead of popping up before the phone can play any of its voice.
@@ -129,6 +133,22 @@ ids.a.currentTime = 101.9; tick();
 if (latest() === "held for the voice") throw new Error("shown before the playhead reached it");
 ids.a.currentTime = 102; tick();
 if (latest() !== "held for the voice") throw new Error("never shown once the voice reached it");
+
+// MP3 and subtitle packets can arrive in different-sized bursts. Once one line maps the
+// bridge's continuous audio clock to this audio element, a late SSE packet must not move the
+// next line to the newer buffered edge.
+ids.a.currentTime = 200; ids.a.buffered = buffered(0, 202);
+const audioQuery = Object.fromEntries(ids.a.src.split("?")[1].split("&").map((part) => part.split("=")));
+eventSource.emit("audio-sync", { client: audioQuery.client, session: audioQuery.session, origin: 298 });
+say("out", "clock anchor", 0, 500);       // server 500 maps to this phone's 202
+ids.a.currentTime = 202; tick();
+ids.a.buffered = buffered(0, 206);         // next SSE arrives a second later than its audio
+say("out", "stable through jitter", 0, 503);
+ids.a.currentTime = 204.9; tick();
+if (latest() === "stable through jitter") throw new Error("audio clock released a line early");
+ids.a.currentTime = 205; tick();
+if (latest() !== "stable through jitter")
+  throw new Error("subtitle jitter moved a line away from its voice");
 
 // ... what was heard does not wait: nothing is reading it out
 ids.a.currentTime = 100; ids.a.buffered = buffered(0, 105);

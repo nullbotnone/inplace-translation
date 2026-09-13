@@ -168,6 +168,11 @@ sessions:
 - **Translation quality** — the engine, the language model, the voice, how much context to
   keep, how long a pause ends a sentence, and how much voice to buffer before playing. Most
   need a restart and the console says so when it matters; the voice buffer applies at once.
+  The bridge tells each phone exactly where its MP3 connection began in the continuous audio
+  stream, so uneven MP3 and subtitle delivery cannot move a pop-up away from its voice. It
+  also excludes silent PCM at the head and tail of each generated utterance from subtitle
+  timing. Within the audible sentence, Chinese is revealed by character and English by
+  approximate syllable timing; exact phoneme timestamps are not available from the voices.
   Choosing the omni engine greys out the three settings it does not use — the spoken language,
   the language model and the context — rather than leaving them there to be set pointlessly.
 - **Glossary** — edit it in the browser. Saved changes apply to the very next sentence, no

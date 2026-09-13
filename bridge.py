@@ -8,7 +8,7 @@ an operator console at http://localhost:8000/admin
     python3 bridge.py
 """
 import argparse, array, base64, contextlib, json, queue, re, signal, socket, subprocess, sys, threading, time
-import urllib.error, urllib.request
+import urllib.error, urllib.parse, urllib.request
 from difflib import SequenceMatcher
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,6 +36,7 @@ MP3_CHUNK = 256                   # one mp3 frame at this bitrate and rate, in b
                                   # 1024 held four frames back: 303 ms before the first byte
                                   # left the encoder, against 124 ms a frame at a time.
 MAX_QUEUED = 10 * BITRATE // 8 // MP3_CHUNK   # ~10 s buffered per listener before eviction
+PCM_SPEECH_FLOOR = 128            # ignore digital silence at the head and tail of TTS output
 OMNI_PORT = 8770                  # the audio-in model's own OpenAI server
 OMNI_MODEL = "mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit"
 OMNI_PYTHON = HERE / ".venv-omni/bin/python"   # mlx-vlm needs its own venv; see README
@@ -318,6 +319,7 @@ out_q = queue.Queue()             # translated PCM, chunked
 audio_lock = threading.Lock()
 queued_bytes = 0                  # handed to the pacer
 played_bytes = 0                  # handed on to the encoder, at wall-clock rate
+stream_pcm_bytes = 0              # all PCM handed on, including silence between translations
 booked = []                       # [(at_byte, subtitle args)] waiting for the voice to reach it
 speaking = threading.Event()      # a turn's audio is still arriving: silence now is a hole
                                   # in the middle of a word, not a pause between sentences
@@ -325,6 +327,10 @@ ran_dry = threading.Event()       # ... and it happened during this turn
 audio = Fanout(MAX_QUEUED)        # mp3 chunks
 subs = Fanout(20)                 # subtitle lines
 events = Fanout(50)               # operator console updates
+encoded_bytes = 0                 # byte position in the one continuous CBR MP3 stream
+audio_sessions = {}               # page token -> where its current MP3 stream began
+subtitle_clients = {}              # page token -> its private subtitle queue(s)
+audio_sessions_lock = threading.Lock()
 recent = []                       # last few lines, so a phone joining mid-sermon sees context
 # Whisper does not transcribe a turn once. It re-transcribes the whole of it as the speaker
 # keeps going -- "死亡的原因是什么呢", then that plus the next clause, then the lot again with
@@ -347,6 +353,26 @@ def queue_audio(chunk):
     return at
 
 
+def pcm_speech_bounds(raw):
+    """Return byte offsets around the audible part of one s16le TTS turn.
+
+    TTS engines commonly put a few hundred milliseconds of zeroes around an utterance. The
+    buffer begins there, but the pop-up must begin at the first sound and finish at the last;
+    treating those zeroes as speech is a direct, repeatable text-before-voice error.
+    """
+    samples = array.array("h")
+    samples.frombytes(raw[:len(raw) // 2 * 2])
+    if sys.byteorder != "little":
+        samples.byteswap()
+    first = next((i for i, sample in enumerate(samples)
+                  if abs(sample) >= PCM_SPEECH_FLOOR), None)
+    if first is None:
+        return 0, len(raw)
+    last = len(samples) - 1 - next(i for i, sample in enumerate(reversed(samples))
+                                   if abs(sample) >= PCM_SPEECH_FLOOR)
+    return first * 2, (last + 1) * 2
+
+
 def say_at(position, kind, text, secs=0.0, reply_to=None):
     """Publish a subtitle when the voice reaches this position, or now if it is already past.
 
@@ -357,7 +383,12 @@ def say_at(position, kind, text, secs=0.0, reply_to=None):
         if position > played_bytes:
             booked.append((position, (kind, text, secs, reply_to)))
             return
-    subtitle(kind, text, secs, reply_to)
+        # Usually the transcript is booked before its voice plays. If it arrives late, walk
+        # back over the translated PCM just played so its words still begin where the voice
+        # did instead of at the time the transcript happened to arrive. There is normally no
+        # silence in this few-millisecond interval; clamping keeps a stale position harmless.
+        voice_at = max(0, stream_pcm_bytes - max(0, played_bytes - position)) / (RATE * 2)
+    subtitle(kind, text, secs, reply_to, voice_at)
 
 
 def flush_booked():
@@ -416,7 +447,7 @@ def same_turn(was, now):
         None, was[:shared], now[:shared]).ratio() >= SAME_TURN
 
 
-def subtitle(kind, text, secs=0.0, reply_to=None):
+def subtitle(kind, text, secs=0.0, reply_to=None, voice_at=None):
     """kind is "src" (what the preacher said) or "out" (the translation). Returns its id.
 
     secs is how long the voice takes to say this line. A whole sentence put on screen at the
@@ -426,6 +457,9 @@ def subtitle(kind, text, secs=0.0, reply_to=None):
     reply_to is the heard line this one translates. A translation waits for the voice to
     reach it, and by then the preacher is a sentence or two further on, so the screen cannot
     work out the pairing from the order things arrive in -- only the bridge can.
+
+    voice_at is the audible start on the encoder's continuous PCM clock. Combined with the
+    first MP3 position sent to each phone, it places the line without network-time guesses.
     """
     global heard_turn, turns
     if not (text := text.strip()):
@@ -442,6 +476,11 @@ def subtitle(kind, text, secs=0.0, reply_to=None):
                 "secs": round(secs, 2), "id": turns}
         if reply_to is not None:
             line["reply_to"] = reply_to
+        # A phone's audio element has its own zero point, but every translated line shares
+        # this continuous server clock. The phone learns the offset once, then later lines
+        # cannot jump early or late merely because SSE and MP3 packets took different paths.
+        if voice_at is not None:
+            line["voice_at"] = round(voice_at, 3)
         recent.append(line)
         del recent[:-8]
         heard_turn = line if kind == "src" else None   # its translation ends the turn
@@ -724,6 +763,7 @@ class Pipeline:
         # over turns that do not, which is cheaper than charging every service for the worst
         # one. Piper needs none of it -- it is on the CPU and has no gusts to cover.
         held = bytearray()
+        turn_audio = bytearray()     # retained only to locate real speech inside TTS silence
         # Where this turn's audio started in the stream, and where the turn whose text has
         # not arrived yet started. The pipeline sends a turn's transcript after the last of
         # its audio, so without this the subtitle would be booked a whole sentence late.
@@ -742,7 +782,9 @@ class Pipeline:
                 t = ev.get("type", "")
                 # GA calls it response.output_audio.delta; older builds response.audio.delta
                 if t.endswith("audio.delta") and "transcript" not in t:
-                    held += base64.b64decode(ev["delta"])
+                    delta = base64.b64decode(ev["delta"])
+                    held += delta
+                    turn_audio += delta
                     # Read per gust, so an operator who hears chopping can raise the lead
                     # mid-sermon and hear the difference on the next sentence.
                     if len(held) >= (self.cfg["lead_ms"] + self.extra_lead) * RATE * 2 // 1000:
@@ -761,8 +803,14 @@ class Pipeline:
                     # the voice will take to say the line it is about to be sent.
                     # `or` would read the first turn of the session as no turn at all: its
                     # audio starts at position 0, and 0 is where a sermon begins.
-                    spoken_len = 0 if turn_at is None else queued_bytes - turn_at
-                    spoken_at, turn_at = turn_at, None
+                    turn_len = 0 if turn_at is None else queued_bytes - turn_at
+                    speech_start, speech_end = pcm_speech_bounds(turn_audio)
+                    # Book the pop-up against audible speech, not silent PCM generated ahead
+                    # of it. Its reveal duration likewise excludes the quiet tail.
+                    spoken_at = None if turn_at is None else turn_at + min(speech_start, turn_len)
+                    spoken_len = max(0, min(speech_end, turn_len) - min(speech_start, turn_len))
+                    turn_at = None
+                    turn_audio.clear()
                     spoken_heard, turn_heard = turn_heard, None
                     speaking.clear()
                     self.tune_lead()
@@ -984,7 +1032,7 @@ def broadcast_died(why):
 
 def pacer(stdin, stop=None):
     """Feed ffmpeg at wall-clock rate: translated audio when we have it, silence otherwise."""
-    global played_bytes
+    global played_bytes, stream_pcm_bytes
     # pos walks through buf rather than reslicing it: buf now holds a whole turn, and
     # copying a quarter of a megabyte fifty times a second is not what this thread is for.
     silence, buf, pos = b"\0" * (BLOCK * 2), b"", 0
@@ -1012,12 +1060,17 @@ def pacer(stdin, stop=None):
             # Only translated audio moves the stream position; the silence between sentences
             # is not something a subtitle can be booked against.
             with audio_lock:
+                voice_before, stream_before = played_bytes, stream_pcm_bytes
                 played_bytes += len(chunk)
+                stream_pcm_bytes += len(chunk)
                 due = [b for b in booked if b[0] <= played_bytes]
                 if due:
                     booked[:] = [b for b in booked if b[0] > played_bytes]
-            for _, line in due:
-                subtitle(*line)
+            for position, line in due:
+                # A booking can fall inside this 20 ms block. Preserve that position rather
+                # than quantising every pop-up to the end of the block.
+                voice_at = (stream_before + max(0, position - voice_before)) / (RATE * 2)
+                subtitle(*line, voice_at)
         else:
             chunk = silence
             # The voice is generated ahead of being played, so an empty queue mid-turn means
@@ -1027,6 +1080,8 @@ def pacer(stdin, stop=None):
             starved += speaking.is_set()
             if starved == STARVED_BLOCKS:
                 ran_dry.set()
+            with audio_lock:
+                stream_pcm_bytes += len(chunk)
         try:
             stdin.write(chunk)
             stdin.flush()
@@ -1043,8 +1098,15 @@ def pacer(stdin, stop=None):
 
 
 def fanout(stdout):
+    global encoded_bytes
     while chunk := stdout.read(MP3_CHUNK):
-        audio.publish(chunk)
+        with audio_lock:
+            at = encoded_bytes
+            encoded_bytes += len(chunk)
+        # The byte position gives each new listener an exact origin in this continuous CBR
+        # stream. Without it the phone can only guess from which packets happened to arrive
+        # beside a subtitle packet, and that guess is precisely what made text run early.
+        audio.publish((at, chunk))
     broadcast_died("the audio encoder stopped producing output")
 
 
@@ -1126,16 +1188,88 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+    def stream_audio(self, client, session):
+        """Stream MP3 and tell this page the global position of its first byte."""
+        self.send_response(200)
+        for k, v in [("Content-Type", "audio/mpeg"), ("Cache-Control", "no-cache"),
+                     ("Connection", "close")]:
+            self.send_header(k, v)
+        self.end_headers()
+        first = True
+        with audio.subscribe() as q:
+            try:
+                while True:
+                    at, chunk = q.get(timeout=15)
+                    if first:
+                        first = False
+                        if client and session:
+                            sync = {"client": client, "session": session,
+                                    "origin": round(at * 8 / BITRATE, 6)}
+                            with audio_sessions_lock:
+                                audio_sessions[client] = sync
+                                while len(audio_sessions) > 256:
+                                    audio_sessions.pop(next(iter(audio_sessions)))
+                                listeners = list(subtitle_clients.get(client, ()))
+                            # Private delivery matters in a room full of phones: one new
+                            # audio connection must not put a sync event into every listener's
+                            # bounded subtitle queue.
+                            event = f"event: audio-sync\ndata: {json.dumps(sync)}\n\n".encode()
+                            for listener in listeners:
+                                listener.put(event)
+                    self.wfile.write(chunk)
+            except Exception:
+                pass
+
+    def stream_subtitles(self, client, backlog):
+        """Stream public lines plus audio-origin events private to this browser page."""
+        self.send_response(200)
+        for k, v in [("Content-Type", "text/event-stream"), ("Cache-Control", "no-cache"),
+                     ("Connection", "close")]:
+            self.send_header(k, v)
+        self.end_headers()
+        with subs.subscribe() as q:
+            with audio_sessions_lock:
+                subtitle_clients.setdefault(client, set()).add(q)
+                sync = audio_sessions.get(client)
+            try:
+                if sync:
+                    self.wfile.write(
+                        f"event: audio-sync\ndata: {json.dumps(sync)}\n\n".encode())
+                for item in backlog:
+                    self.wfile.write(item)
+                while True:
+                    try:
+                        self.wfile.write(q.get(timeout=15))
+                    except queue.Empty:
+                        self.wfile.write(b":\n\n")
+            except Exception:
+                pass
+            finally:
+                with audio_sessions_lock:
+                    listeners = subtitle_clients.get(client, set())
+                    listeners.discard(q)
+                    if not listeners:
+                        subtitle_clients.pop(client, None)
+
     def do_GET(self):
-        path = self.path.split("?")[0]
+        request = urllib.parse.urlsplit(self.path)
+        path = request.path
+        query = urllib.parse.parse_qs(request.query)
+
+        def token(name):
+            value = (query.get(name) or [""])[0]
+            return value if re.fullmatch(r"[A-Za-z0-9._-]{1,80}", value) else ""
+
         if path.startswith("/stream.mp3"):
-            self.stream(audio, "audio/mpeg")
+            self.stream_audio(token("client"), token("session"))
         elif path == "/subs":
             # The backlog is what was said before this phone arrived, so it is shown whole:
             # revealing it word by word would replay a minute of sermon in slow motion.
-            self.stream(subs, "text/event-stream",
-                        [f"data: {json.dumps({**l, 'secs': 0})}\n\n".encode()
-                         for l in list(recent)])
+            client = token("client")
+            backlog = [f"data: {json.dumps({k: (0 if k == 'secs' else v)
+                                              for k, v in l.items() if k != 'voice_at'})}\n\n".encode()
+                       for l in list(recent)]
+            self.stream_subtitles(client, backlog)
         elif path == "/admin":
             if self.local_only():
                 self.send_file("admin.html", "text/html; charset=utf-8")

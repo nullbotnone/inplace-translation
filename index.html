@@ -98,6 +98,8 @@
   const $ = (id) => document.getElementById(id);
   const audio = $("a"), button = $("b"), log = $("log");
   let wantsAudio = false, retry = null;
+  const pageClient = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let audioSession = "", audioGeneration = 0;
   const BASE_RESERVE_S = 1.25, MAX_RESERVE_S = 3, RESERVE_STEP_S = .5;
   const CHASE_MARGIN_S = .75, HARD_CHASE_MARGIN_S = 2, CRITICAL_BUFFER_S = .5;
   let reserveS = BASE_RESERVE_S, playbackStarted = false, lastBufferTrouble = -Infinity;
@@ -110,9 +112,10 @@
     // Audio already waiting against the old stream can never be heard after src is replaced.
     // Keep its text, but do not leave it pinned to a timestamp from a dead connection.
     while (waiting.length) addLine(waiting.shift().line);
-    playbackStarted = false; audio.playbackRate = 1;
+    playbackStarted = false; audio.playbackRate = 1; voiceClockOffset = null;
+    audioSession = `${pageClient}-${++audioGeneration}`;
     wantsAudio = true; playback("loading", "Joining live audio · 正在连接", "Connecting to the live stream · 正在连接直播");
-    audio.src = "/stream.mp3?" + Date.now(); return audio.play();
+    audio.src = `/stream.mp3?client=${pageClient}&session=${audioSession}`; return audio.play();
   };
   button.onclick = () => {
     if (wantsAudio && !audio.paused) {
@@ -303,24 +306,30 @@
   };
   // The bridge publishes a line as its own audio starts down the wire, but this phone plays
   // that audio later -- after whatever it buffered on the way in, and after whatever is
-  // already queued ahead of it. So the line's audio sits at a known place in the phone's own
-  // timeline: the end of what it holds right now. Show the line when the playhead gets
-  // there. That is a position, not a delay, so it survives a rebuffer, the 6% catch-up, and
-  // the seconds before playback has started at all -- where a delay measured against a
-  // stopped playhead is zero and puts the first line on screen before any audio exists.
+  // already queued ahead of it. When the MP3 connection receives its first byte, the bridge
+  // sends that byte's continuous stream position over the subtitle connection. That maps
+  // every translated line to this phone's timeline without using packet arrival time. Show
+  // it when the playhead gets there. That is a position, not a delay, so it survives a
+  // rebuffer, the 6% catch-up, and the seconds before playback has started at all -- where a
+  // delay measured against a stopped playhead is zero and puts the first line on screen
+  // before audio exists.
   //
   // Only the translation waits: what was heard is not read out by anything, and it is the
   // first sign on screen that the room is being heard.
   const MAX_HOLD_S = 15, RELEASE_STEP_MS = 50;
   const waiting = [];              // [{ at: audio position, or null until a buffer exists }]
+  // The bridge supplies a continuous audio clock. This phone's media clock starts at zero
+  // whenever it joins; the audio-sync event supplies that exact origin. MP3 and SSE use
+  // separate sockets, so inferring the origin from their arrival times is not reliable.
+  let voiceClockOffset = null;
   const anchorWaiting = (now = Date.now()) => {
     const range = bufferedRange();
-    if (range === null) return;
     for (const held of waiting) if (held.at === null) {
-      // buffered.end advances with the live stream. If it appeared after the subtitle did,
-      // walk the edge back by that wall time to recover where the line arrived. This keeps
-      // startup and a rebuffer from moving the caption to the end of a later buffer burst.
-      held.at = Math.max(range.start, range.end - Math.max(0, now - held.since) / 1000);
+      if (voiceClockOffset !== null && Number.isFinite(held.line.voice_at))
+        held.at = voiceClockOffset + held.line.voice_at;
+      else if (range !== null && !Number.isFinite(held.line.voice_at))
+        // Backward compatibility with a bridge from before audio-clock positions existed.
+        held.at = Math.max(range.start, range.end - Math.max(0, now - held.since) / 1000);
     }
   };
   const showWithVoice = (line) => {
@@ -329,7 +338,9 @@
       return addLine(line);               // nobody is listening; nothing to wait for
     const now = Date.now();
     anchorWaiting(now);
-    waiting.push({ at: edge, line, since: now });
+    const at = voiceClockOffset !== null && Number.isFinite(line.voice_at)
+      ? voiceClockOffset + line.voice_at : Number.isFinite(line.voice_at) ? null : edge;
+    waiting.push({ at, line, since: now });
   };
   const releaseSpoken = () => {
     anchorWaiting();
@@ -342,7 +353,17 @@
       { const held = waiting.shift(); addLine(held.line, held.at); }
   };
   setInterval(releaseSpoken, RELEASE_STEP_MS);
-  const es = new EventSource("/subs");
+  const es = new EventSource(`/subs?client=${pageClient}`);
+  es.addEventListener("audio-sync", (event) => { try {
+    const sync = JSON.parse(event.data);
+    if (sync.client !== pageClient || sync.session !== audioSession
+        || !Number.isFinite(sync.origin)) return;
+    // currentTime zero is the first MP3 byte this connection received. Both the origin and
+    // each line's voice_at are positions on the server's continuous audio timeline, so this
+    // is an exact mapping rather than an inference from unrelated packet arrival times.
+    voiceClockOffset = -sync.origin;
+    anchorWaiting();
+  } catch (error) { console.error("Bad audio sync event", error); } });
   es.onopen = () => connection("live", "Live · 已连接");
   es.onerror = () => connection("offline", "Reconnecting · 重新连接中");
   es.onmessage = (event) => { try {

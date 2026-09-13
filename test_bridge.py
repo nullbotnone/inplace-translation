@@ -71,6 +71,31 @@ heard = [l for l in bridge.recent if l["kind"] == "src"]
 assert reply_to == heard[0]["id"], \
     f"translated 你好 but answered {reply_to}, out of {[(l['id'], l['text']) for l in heard]}"
 
+# A generated turn can begin and end with silent PCM. The buffer begins at those bytes, but
+# the visible translation must begin at the first audible sample and reveal over the audible
+# duration; otherwise the pop-up is predictably ahead of the voice even on a perfect network.
+lead_silence = b"\0\0" * (bridge.RATE // 5)       # 200 ms
+voiced = b"\xd0\x07" * (bridge.RATE * 2 // 5)    # 400 ms, sample value 2000
+tail_silence = b"\0\0" * (bridge.RATE // 10)     # 100 ms
+tts_turn = lead_silence + voiced + tail_silence
+turn_start = bridge.queued_bytes
+p_silence = bridge.Pipeline()
+p_silence.ws = [json.dumps(e) for e in (
+    {"type": "conversation.item.input_audio_transcription.completed", "transcript": "test"},
+    {"type": "response.output_audio.delta", "delta": b64(tts_turn)},
+    {"type": "response.output_audio.done"},
+    {"type": "response.output_audio_transcript.done", "transcript": "spoken"},
+)]
+booked_silence = []
+bridge.say_at = lambda *a: booked_silence.append(a)
+p_silence._read_ws()
+bridge.say_at = real_say_at
+assert bridge.out_q.get_nowait() == tts_turn
+at, _, _, secs, _ = booked_silence[0]
+assert at == turn_start + len(lead_silence) + lag, \
+    f"pop-up starts {at - turn_start} bytes into a {len(lead_silence)}-byte silent head"
+assert abs(secs - .4) < .001, f"silent PCM stretched {secs}s of audible speech"
+
 # ... but only up to the lead: a long turn starts playing while the rest is still being
 # spoken, instead of the listener waiting out the whole turn first
 lead = bridge.DEFAULTS["lead_ms"] * bridge.RATE * 2 // 1000
@@ -112,6 +137,9 @@ run_pacer(0.2)
 assert not bridge.recent, "the subtitle jumped the sentence being spoken in front of it"
 run_pacer(0.45)
 assert [l["text"] for l in bridge.recent] == ["神爱世人"], f"never published: {bridge.recent}"
+# The phone uses this continuous position to keep later lines stable when MP3 and SSE
+# delivery jitter differs. It is the point on the encoder's PCM clock where this voice began.
+assert isinstance(bridge.recent[0].get("voice_at"), float), bridge.recent[0]
 # ... it is published as its own sentence starts, not when that sentence ends
 assert bridge.out_q.qsize() == 0 and len(bridge.recent) == 1
 # ... and a position the voice has already passed goes out at once, so the first sentence
@@ -196,6 +224,36 @@ with f.subscribe() as fast, f.subscribe() as slow:
     assert fast in f.qs, "keeping-up listener was dropped"
     assert f.count() == 1, "count() disagrees with the live set"
 assert not f.qs, "subscribe() did not clean up on exit"
+
+# A phone is told the exact CBR stream position of the first MP3 bytes it receives. The
+# subtitle socket carries the handshake, while the audio response remains unmodified MP3.
+class OneAudioWrite:
+    def __init__(self): self.wfile, self.body = self, None
+    def send_response(self, *_): pass
+    def send_header(self, *_): pass
+    def end_headers(self): pass
+    def write(self, body): self.body = body; raise OSError("one packet is enough")
+
+
+audio_response = OneAudioWrite()
+sync_events = queue.Queue()
+with bridge.audio_sessions_lock:
+    bridge.subtitle_clients["phone-1"] = {sync_events}
+audio_thread = threading.Thread(target=bridge.Handler.stream_audio,
+                                args=(audio_response, "phone-1", "listen-1"))
+audio_thread.start()
+limit = time.monotonic() + 1
+while not bridge.audio.count() and time.monotonic() < limit:
+    time.sleep(.005)
+bridge.audio.publish((bridge.BITRATE // 8, b"mp3"))  # exactly one second into CBR
+audio_thread.join(1)
+sync = sync_events.get_nowait().decode()
+with bridge.audio_sessions_lock:
+    bridge.subtitle_clients.clear()
+    bridge.audio_sessions.clear()
+assert audio_response.body == b"mp3", "sync metadata leaked into the MP3 response"
+assert '"session": "listen-1"' in sync and '"origin": 1.0' in sync, sync
+assert not audio_thread.is_alive(), "the test audio response did not close"
 
 # subtitles reach phones and the console, and a late phone gets the recent backlog
 bridge.recent.clear()
