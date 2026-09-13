@@ -10,8 +10,8 @@ mic ─▶ bridge.py ──┼─▶ /subs (subtitles) ─────┴─▶ 
        │           └─▶ /admin ──────────────────▶ you, on this Mac only
        │
        └─ spawns: run_pipeline.py (speech-to-speech serve)
-                    cascade:  VAD → Whisper → translator → Kokoro
-                    omni:     VAD → Qwen3-Omni ─────────→ Kokoro
+                    cascade:  VAD → Whisper → translator → Piper
+                    omni:     VAD → Qwen3-Omni ─────────→ Piper
 ```
 
 `bridge.py` starts the pipeline, so there is one thing to run and one page to drive it.
@@ -37,10 +37,10 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 
 | | |
 |---|---|
-| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Kokoro is the default stack; its models download at ~4.3 GB, plus runtime caches |
+| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Piper is the default stack; its models download at ~4 GB, plus runtime caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
 | Book names right | **64 GB+**, which buys the 35 B translator — the only one that gets 约翰二书 right — and the optional omni engine |
-| Disk | ~6 GB: 4.3 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 37.7 GB, and the omni engine another 38.8 GB |
+| Disk | ~6 GB: 4 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 37.7 GB, and the omni engine another 38.8 GB |
 
 Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
 MLX inference; on battery the Mac throttles and the translation falls behind.
@@ -57,8 +57,9 @@ cd ~                                    # not Documents, Desktop or Downloads �
 git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install speech-to-speech 'misaki[zh]' segno   # misaki[zh] is Kokoro's Chinese
-                                                  # voices; segno draws the QR code
+pip install speech-to-speech 'misaki[zh]' segno piper-tts   # misaki[zh] is Kokoro's
+                                                  # Chinese voices, piper-tts is the CPU
+                                                  # voice engine; segno draws the QR code
 ```
 
 The omni engine is optional and needs a second environment, because `mlx-vlm` pulls a newer
@@ -80,7 +81,7 @@ hard-codes its own path:
 ```bash
 mv ~/Documents/inplace-translation ~/inplace-translation && cd ~/inplace-translation
 rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate
-pip install speech-to-speech 'misaki[zh]' segno   # quick: the wheels are still cached
+pip install speech-to-speech 'misaki[zh]' segno piper-tts   # quick: wheels are cached
 ```
 
 Approving the Terminal prompt works just as well; moving the folder simply means there is no
@@ -241,11 +242,31 @@ All of this lives in the console; the notes below are why each one is there.
   rather than translating it.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
-- **Voice engine** — Kokoro keeps up with the preacher and is the default. Qwen3-TTS sounds
-  better; switch to it if the room can spare the speed, and back if `!! backlog, dropping
-  audio` appears.
-- **Voice** — Kokoro only. Eight Mandarin voices and twenty American English ones, female and
-  male; Qwen3-TTS has one voice of its own and the setting greys out. The list follows what
+- **Voice engine** — Piper is the default, and the reason is the GPU rather than the clock.
+  It runs on the CPU, so unlike the other two it never waits for the translator to let go —
+  and during a sermon the translator always has it. One sentence of English, on this Mac:
+
+  | | Piper | Kokoro |
+  |---|---|---|
+  | GPU idle | 0.049 s | 0.077 s |
+  | GPU busy | 0.051 s | 0.553 s |
+
+  Idle they are the same engine; busy is the one that matters. It costs quality: Piper's
+  Chinese is flatter than Kokoro's and its English is a shade more mechanical. It also costs
+  the least memory of the three, and its voices are ~60 MB each rather than a model in the
+  Hugging Face cache.
+
+  Five English voices, and one Chinese one — 华言, female. Piper's other two Mandarin voices
+  read pinyin through g2pW, which is `pip install 'piper-tts[zh]'` and a 113 MB download on
+  top, so they are not offered.
+
+  Kokoro is where the choice of Chinese voices is: eight of them, and it keeps up with the
+  preacher too as long as the translator leaves it room. Qwen3-TTS sounds better than either
+  and is the slowest; switch to it if the room can spare the speed, and back if `!! backlog,
+  dropping audio` appears.
+- **Voice** — Kokoro and Piper; Qwen3-TTS has one voice of its own and the setting greys out.
+  Kokoro offers eight Mandarin voices and twenty American English ones, female and male;
+  Piper five English and one Chinese. The list follows what
   listeners hear, because a voice comes with the phonemiser for its own language and an
   American voice handed Chinese text reads it as the words "Chinese letter", once per
   character. Changing what listeners hear therefore changes the voice too, and needs a
@@ -286,7 +307,7 @@ All of this lives in the console; the notes below are why each one is there.
 
 ## Where the models live
 
-The first run downloads about 4.3 GB into your home directory, not into the project folder,
+The first run downloads about 4 GB into your home directory, not into the project folder,
 so deleting the repo reclaims none of it. Switching the translator in the console downloads
 that model too, the first time you select it: the 8B is 4.6 GB, the 35B is 37.7 GB and the omni
 engine's model is 38.8 GB, and none of them replaces what is already there. The omni model lands
@@ -294,8 +315,9 @@ in the same cache even though it runs from `.venv-omni`.
 
 | | |
 |---|---|
-| `~/.cache/huggingface/hub` | recognition, translation and voice models, ~4.3 GB, plus any translator or voice engine you switched to |
+| `~/.cache/huggingface/hub` | recognition and translation models, ~4 GB, plus any translator or voice engine you switched to |
 | `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
+| `~/.cache/piper-voices` | Piper's voices, ~60 MB each, downloaded the first time one is selected. `rm -rf` it to clear them |
 
 To clear them, activate this project's environment and remove them by name:
 
@@ -304,12 +326,12 @@ source .venv/bin/activate
 hf cache ls                    # what is cached, and how big
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/Kokoro-82M-bf16 \
             model/mlx-community/whisper-large-v3-turbo
 
 # only if you switched the translator or the voice engine in the console, or ran
 # a version that used Smart Turn; hf cache ls above shows which you actually have
-hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+hf cache rm model/mlx-community/Kokoro-82M-bf16 \
+            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
             model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit \

@@ -24,13 +24,20 @@ clip ("wires, wires, wires, wires, ..."), and that gets translated and spoken ov
 sermon. Whisper's own tell for this is how well the text compresses, and the pipeline throws
 the transcription away before the translator ever sees it.
 
+Piper is added here as a third voice, the same way: the registry, the parser's choices and
+the handler module all live in this repo rather than in the installed package, so nothing
+upstream has to know about it. piper_handler.py says why it is worth having.
+
 # ponytail: patching dicts and a method in someone else's modules. If upstream lets the
 # target language reach the TTS handler (a --kokoro_follow_output flag, say) and takes a
 # candidate list for detection (--languages en,zh), delete this file and go back to calling
 # `speech-to-speech` directly from bridge.py.
 """
-import sys, zlib
+import sys, types, zlib
+from dataclasses import dataclass, field
 
+from speech_to_speech.arguments_classes.module_arguments import ModuleArguments
+from speech_to_speech.backend_registry import TTS_BACKENDS, BackendSpec, _simple_handler_factory
 from speech_to_speech.STT.base_stt_handler import BaseSTTHandler
 from speech_to_speech.TTS import kokoro_handler
 from speech_to_speech.cli import main
@@ -119,6 +126,38 @@ def should_emit_output(self, output):
 
 
 BaseSTTHandler.should_emit_output = should_emit_output
+
+
+@dataclass
+class PiperTTSHandlerArguments:
+    """What --tts piper accepts. Named like every other backend's flags, since the parser
+    builds them from the field names and strips the prefix again on the way to setup()."""
+
+    piper_voice: str = field(
+        default="en_US-ryan-medium",
+        metadata={"help": "Piper voice, e.g. 'en_US-ryan-medium' or 'zh_CN-huayan-medium'. "
+                          "Downloaded on first use. A voice speaks the language in its name."},
+    )
+    piper_speed: float = field(
+        default=1.0, metadata={"help": "Speech speed multiplier. Default is 1.0."})
+    piper_blocksize: int = field(
+        default=512, metadata={"help": "Audio chunk size in samples for streaming output."})
+    piper_voices_dir: str = field(
+        default="", metadata={"help": "Where voices are kept. Default is ~/.cache/piper-voices."})
+
+
+TTS_BACKENDS["piper"] = BackendSpec(
+    "piper", "tts", PiperTTSHandlerArguments,
+    # piper_handler.py sits next to this file, which is the script, so it is importable by
+    # bare name from inside the pipeline.
+    _simple_handler_factory("piper_handler", "PiperTTSHandler",
+                            setup_should_listen=True, context_kwargs=True),
+    config_prefix="piper",
+)
+# --tts is checked against a tuple of the names that existed when the arguments module was
+# imported, which was before the line above. Hand it the registry as it stands now.
+_tts_field = ModuleArguments.__dataclass_fields__["tts"]
+_tts_field.metadata = types.MappingProxyType({**_tts_field.metadata, "choices": tuple(TTS_BACKENDS)})
 
 if __name__ == "__main__":
     sys.exit(main())

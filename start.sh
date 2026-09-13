@@ -10,7 +10,7 @@ if [ ! -f .venv/bin/activate ]; then
     echo "No Python environment here yet. Set one up first:" >&2
     echo "    brew install python@3.12" >&2
     echo "    python3.12 -m venv .venv && source .venv/bin/activate" >&2
-    echo "    pip install speech-to-speech 'misaki[zh]' segno" >&2
+    echo "    pip install speech-to-speech 'misaki[zh]' segno piper-tts" >&2
     exit 1
 fi
 # misaki, which Kokoro's text processing needs, has no release for 3.13+. A venv built

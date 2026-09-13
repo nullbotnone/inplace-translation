@@ -35,20 +35,36 @@ LAUNCH = [sys.executable, str(HERE / "run_pipeline.py"), "serve"]
 CONFIG_PATH = HERE / "config.json"
 GLOSSARY_PATH = HERE / "glossary.txt"
 
-# Kokoro's voices, by the language they speak. A voice is tied to its language: the first
-# letter of the name is the phonemiser that has to be loaded with it (z = Mandarin,
-# a = American English), and an American voice handed Chinese text says nothing usable. So
-# the target language decides which of these lists the console may offer. Second letter is
-# the gender. Qwen3-TTS has one voice of its own and ignores all of this.
+# Voices, by the engine that speaks them and the language they speak. A voice is tied to its
+# language either way: a Kokoro name starts with the phonemiser that has to be loaded with it
+# (z = Mandarin, a = American English) and an American voice handed Chinese text says nothing
+# usable, while a Piper voice is one downloaded model that only ever speaks the language in
+# its name. So the engine and the target language together decide what the console may offer.
+# Qwen3-TTS has one voice of its own and appears here with none.
 VOICES = {
-    "zh": ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
-           "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
-    "en": ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
-           "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
-           "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
-           "am_onyx", "am_puck", "am_santa"],
+    "kokoro": {
+        # Second letter of a Kokoro name is the gender.
+        "zh": ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
+               "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
+        "en": ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
+               "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+               "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
+               "am_onyx", "am_puck", "am_santa"],
+    },
+    # Piper ships hundreds; these are the single-speaker ones for our two languages whose
+    # text processing is in the box. A multi-speaker voice would need a speaker id the
+    # console has nowhere to put, and Piper's other two Mandarin voices phonemise through
+    # g2pW, which is a `pip install piper-tts[zh]` and a 113 MB model download away.
+    "piper": {
+        "zh": ["zh_CN-huayan-medium"],
+        "en": ["en_US-ryan-medium", "en_US-hfc_male-medium", "en_US-lessac-medium",
+               "en_US-amy-medium", "en_US-kristin-medium"],
+    },
 }
-DEFAULT_VOICE = {"zh": "zm_yunyang", "en": "am_michael"}
+DEFAULT_VOICE = {
+    "kokoro": {"zh": "zm_yunyang", "en": "am_michael"},
+    "piper": {"zh": "zh_CN-huayan-medium", "en": "en_US-ryan-medium"},
+}
 
 DEFAULTS = {
     "device": None,                                              # mic, by name; None = system default
@@ -56,8 +72,8 @@ DEFAULTS = {
     "target": "zh",                                              # what listeners hear
     "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
     "stt": "mlx-audio-whisper",
-    "tts": "kokoro",
-    "voice": DEFAULT_VOICE["zh"],                                # Kokoro only; must match "target"
+    "tts": "piper",                                              # the only voice off the GPU
+    "voice": DEFAULT_VOICE["piper"]["zh"],                       # must match "tts" and "target"
     "chat_size": 2,
     "min_silence_ms": 64,
     "lead_ms": 1500,                                             # voice buffered before it plays
@@ -78,14 +94,21 @@ TARGETS = {"en": "English", "zh": "Chinese"}
 # Listeners hear audio, where 简体 vs 繁體 does not exist. It only shows up in the
 # subtitles, so a church that wants Traditional asks for it in the glossary instead.
 LEGACY_TARGET = {"zh-Hans": "zh", "zh-Hant": "zh"}
-# Every language listeners can be sent to needs voices that speak it. Fail here, at the two
-# lists, rather than with a KeyError at startup or an empty dropdown in the console.
-assert set(VOICES) == set(TARGETS), "VOICES and TARGETS disagree about the languages we speak"
+# Every language listeners can be sent to needs voices that speak it, from every engine that
+# has voices at all. Fail here, at the lists, rather than with a KeyError at startup or an
+# empty dropdown in the console.
+assert all(set(offered) == set(TARGETS) for offered in VOICES.values()), \
+    "VOICES and TARGETS disagree about the languages we speak"
+assert all(DEFAULT_VOICE[engine][lang] in offered
+           for engine, langs in VOICES.items() for lang, offered in langs.items()), \
+    "a default voice is not in its own engine's list"
 
 # The console posts these, and a hand-edited config.json can hold anything. An unknown
 # value here would reach a CLI flag or a dict lookup, so reject it at the door.
-CHOICES = {"source": set(SPOKEN), "target": set(TARGETS), "tts": {"qwen3", "kokoro"},
-           "voice": set(VOICES["zh"]) | set(VOICES["en"]), "engine": {"cascade", "omni"}}
+CHOICES = {"source": set(SPOKEN), "target": set(TARGETS),
+           "tts": {"qwen3", "kokoro", "piper"},
+           "voice": {v for langs in VOICES.values() for names in langs.values() for v in names},
+           "engine": {"cascade", "omni"}}
 BOUNDS = {"chat_size": (0, 8), "min_silence_ms": (32, 2000), "lead_ms": (200, 8000)}
 
 
@@ -185,10 +208,18 @@ def load_config():
             elif key in DEFAULTS:
                 print(f"!! ignoring {key}={value!r} in config.json", flush=True)
     # A config saved before voices existed, or one hand-edited into a mismatch, would ask
-    # Kokoro to read Chinese in an American voice, which comes out as nothing.
-    if cfg["voice"] not in VOICES[cfg["target"]]:
-        cfg["voice"] = DEFAULT_VOICE[cfg["target"]]
+    # Kokoro to read Chinese in an American voice, which comes out as nothing -- or hand
+    # Piper a Kokoro name, which is not a model it can load at all.
+    offered = voices_for(cfg)
+    if offered and cfg["voice"] not in offered:
+        cfg["voice"] = DEFAULT_VOICE[cfg["tts"]][cfg["target"]]
     return cfg
+
+
+def voices_for(cfg):
+    """What this engine can say this target in. Empty for an engine with a voice of its own,
+    which is the console's cue to grey the dropdown out rather than offer nothing."""
+    return VOICES.get(cfg["tts"], {}).get(cfg["target"], [])
 
 
 def omni_prompt(cfg):
@@ -417,7 +448,8 @@ class Pipeline:
         # error. The lang code is the voice name's own first letter, so the phonemiser and
         # the voice can never disagree.
         voice = (["--kokoro_voice", c["voice"], "--kokoro_lang_code", c["voice"][0]]
-                 if c["tts"] == "kokoro" else [])
+                 if c["tts"] == "kokoro" else
+                 ["--piper_voice", c["voice"]] if c["tts"] == "piper" else [])
         if c["engine"] == "omni":
             # No STT stage at all: the VAD's audio goes straight to the model, through the
             # proxy above, which is this same HTTP server.
@@ -599,16 +631,17 @@ class Pipeline:
         """Returns True when the change needs a pipeline restart to take effect."""
         changed = {k: v for k, v in patch.items()
                    if k in DEFAULTS and v != self.cfg[k] and valid(k, v)}
-        # A voice speaks one language, so it is only ever valid against the target it arrives
-        # with: an American voice handed Chinese text says nothing usable. Switching what
-        # listeners hear therefore carries the voice over with it -- and a voice is loaded
-        # when the pipeline starts, which is what makes this the one target change that
-        # cannot be applied live.
-        target = changed.get("target", self.cfg["target"])
-        if changed.get("voice", self.cfg["voice"]) not in VOICES[target]:
+        # A voice belongs to one engine and speaks one language, so it is only ever valid
+        # against the pair it arrives with: an American voice handed Chinese text says
+        # nothing usable, and a Kokoro name is not a model Piper can load. Switching either
+        # therefore carries the voice with it -- and a voice is loaded when the pipeline
+        # starts, which is what makes even a plain target change restart it.
+        wanted = dict(self.cfg, **changed)
+        offered = voices_for(wanted)
+        if offered and wanted["voice"] not in offered:
             changed.pop("voice", None)
-            if self.cfg["voice"] not in VOICES[target]:
-                changed["voice"] = DEFAULT_VOICE[target]
+            if self.cfg["voice"] not in offered:
+                changed["voice"] = DEFAULT_VOICE[wanted["tts"]][wanted["target"]]
         self.cfg.update(changed)
         CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
         if "device" in changed and self.state == "running":

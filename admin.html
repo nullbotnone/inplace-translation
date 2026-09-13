@@ -43,9 +43,9 @@
   #restarthint:not(:empty){margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
   /* A setting the running engine ignores. Dimmed rather than hidden, so switching back does
      not make controls appear out of nowhere. */
-  [data-cascade-only].inert,[data-kokoro-only].inert{opacity:.4}
+  [data-cascade-only].inert,[data-voice-only].inert{opacity:.4}
   [data-cascade-only].inert select,[data-cascade-only].inert input,
-  [data-kokoro-only].inert select{pointer-events:none}
+  [data-voice-only].inert select{pointer-events:none}
   .grow{flex:1}
   .mark{width:2.15rem;height:2.15rem;flex:0 0 auto;border-radius:.55rem;display:block;
         box-shadow:0 8px 20px var(--shadow)}
@@ -307,12 +307,15 @@
         <select id="tts">
           <option value="kokoro" data-zh="Kokoro — 速度较快，可选声音" data-tw="Kokoro — 速度較快，可選聲音"
                   data-en="Kokoro — faster; choice of voices"></option>
+          <option value="piper" data-zh="Piper — 不占用 GPU，翻译忙时仍不卡顿"
+                  data-tw="Piper — 不佔用 GPU，翻譯忙時仍不卡頓"
+                  data-en="Piper — runs on the CPU; never waits for the translator"></option>
           <option value="qwen3" data-zh="Qwen3-TTS — 音质最佳，速度较慢"
                   data-tw="Qwen3-TTS — 音質最佳，速度較慢"
                   data-en="Qwen3-TTS — highest quality; slower"></option>
         </select>
       </label>
-      <label data-kokoro-only class="narrow">
+      <label data-voice-only class="narrow">
         <span data-zh="声音" data-tw="聲音" data-en="Voice"></span>
         <select id="voice"></select>
       </label>
@@ -390,16 +393,24 @@
 const $ = (id) => document.getElementById(id);
 const CFG = ["source", "target", "device", "model", "tts", "voice", "chat_size",
              "min_silence_ms", "lead_ms", "engine"];
-/* Kokoro's voices, per language listeners hear. Must match VOICES in bridge.py -- the server
-   rejects anything else. Second letter of the name is the gender; the rest is a proper name,
-   which reads the same in all three console languages, so only the gender needs translating. */
+/* Voices, per engine and per language listeners hear. Must match VOICES in bridge.py -- the
+   server rejects anything else. Every name is a proper name, which reads the same in all
+   three console languages; on a Kokoro name the second letter is the gender, and that is the
+   only part of a voice that needs translating. */
 const VOICES = {
-  zh: ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
-       "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
-  en: ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
-       "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
-       "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
-       "am_onyx", "am_puck", "am_santa"],
+  kokoro: {
+    zh: ["zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
+         "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"],
+    en: ["af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
+         "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+         "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael",
+         "am_onyx", "am_puck", "am_santa"],
+  },
+  piper: {
+    zh: ["zh_CN-huayan-medium"],
+    en: ["en_US-ryan-medium", "en_US-hfc_male-medium", "en_US-lessac-medium",
+         "en_US-amy-medium", "en_US-kristin-medium"],
+  },
 };
 const LANGS = ["zh", "tw", "en"];
 const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
@@ -547,25 +558,29 @@ function paint() {
   });
   $("enginehint").textContent = omni ? t("omniignores") : "";
 
-  // A Kokoro voice only speaks its own language, so the list follows what listeners hear.
-  // A language bridge.py grew but this list did not is a missing dropdown, not a blank page.
-  const speakable = VOICES[s.config.target] ?? [];
-  const kokoro = s.config.tts === "kokoro" && speakable.length > 0;
-  // Rebuilt only when that language (or the console's) changes: a <select> rebuilt under
-  // the operator's cursor closes itself mid-choice.
-  const voiceKey = s.config.target + lang;
+  // A voice speaks one language and belongs to one engine, so the list follows both. An
+  // engine or language bridge.py grew but this table did not is a missing dropdown, not a
+  // blank page; Qwen3-TTS has one voice of its own and is empty here on purpose.
+  const speakable = (VOICES[s.config.tts] ?? {})[s.config.target] ?? [];
+  // Rebuilt only when the engine, that language, or the console's language changes: a
+  // <select> rebuilt under the operator's cursor closes itself mid-choice.
+  const voiceKey = s.config.tts + s.config.target + lang;
   if ($("voice").dataset.built !== voiceKey) {
     $("voice").dataset.built = voiceKey;
     $("voice").innerHTML = speakable.map((v) => {
-      const name = v.slice(3).replace(/^./, (c) => c.toUpperCase());
-      return `<option value="${v}">${name} · ${t(v[1] === "f" ? "female" : "male")}</option>`;
+      // af_heart -> "Heart · female"; en_US-ryan-medium -> "Ryan". Piper's names carry the
+      // language and the model size, neither of which is a choice being made here.
+      const piper = v.includes("-");
+      const name = (piper ? v.split("-")[1] : v.slice(3)).replace(/^./, (c) => c.toUpperCase());
+      const gender = piper ? "" : ` · ${t(v[1] === "f" ? "female" : "male")}`;
+      return `<option value="${v}">${name}${gender}</option>`;
     }).join("");
   }
-  document.querySelectorAll("[data-kokoro-only]").forEach((el) => {
-    el.classList.toggle("inert", !kokoro);
-    el.querySelectorAll("select").forEach((f) => { f.disabled = !kokoro; });
+  document.querySelectorAll("[data-voice-only]").forEach((el) => {
+    el.classList.toggle("inert", !speakable.length);
+    el.querySelectorAll("select").forEach((f) => { f.disabled = !speakable.length; });
   });
-  $("voicehint").textContent = kokoro ? t("voicehint") : t("qwen3voice");
+  $("voicehint").textContent = speakable.length ? t("voicehint") : t("qwen3voice");
 
   const same = s.config.source === s.config.target;
   // "auto" is not equal to the target but can turn out to be it, and the translator is told

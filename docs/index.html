@@ -225,7 +225,7 @@
       <li data-zh="16 GB 内存（35B 要 64 GB）" data-tw="16 GB 記憶體（35B 要 64 GB）" data-en="16 GB memory (64 GB for the 35B)"></li>
       <li data-zh="USB 音频接口" data-tw="USB 音訊介面" data-en="USB audio interface"></li>
       <li data-zh="Python 3.12" data-tw="Python 3.12" data-en="Python 3.12"></li>
-      <li data-zh="约 4.3 GB 模型下载" data-tw="約 4.3 GB 模型下載" data-en="~4.3 GB of model downloads"></li>
+      <li data-zh="约 4 GB 模型下载" data-tw="約 4 GB 模型下載" data-en="~4 GB of model downloads"></li>
     </ul>
 
 <pre><code>brew install ffmpeg python@3.12   <span class="c"># 3.13+ will not resolve</span>
@@ -233,7 +233,7 @@ cd ~                              <span class="c"># not Documents/Desktop/Downlo
 git clone https://github.com/nullbotnone/inplace-translation
 cd inplace-translation
 python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install speech-to-speech 'misaki[zh]' segno</code></pre>
+pip install speech-to-speech 'misaki[zh]' segno piper-tts</code></pre>
 
     <p class="warn-note"
        data-zh="请把项目放在「文稿」「桌面」「下载」之外的位置。macOS 对这三个文件夹另有保护，在其中首次运行会弹出授权提示，需要有人确认。放在个人文件夹的其他位置则完全不需要授权。"
@@ -319,7 +319,7 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
       <tr><td data-zh="语音识别" data-tw="語音辨識" data-en="Recognition"></td><td data-zh="Whisper · MLX，仅级联" data-tw="Whisper · MLX，僅級聯" data-en="Whisper · MLX, cascade only"></td></tr>
       <tr><td data-zh="翻译" data-tw="翻譯" data-en="Translation"></td><td data-zh="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地运行" data-tw="Qwen3 4B、8B 或 Qwen3.6 35B-A3B，量化，本地執行" data-en="Qwen3 4B, 8B or Qwen3.6 35B-A3B, quantised, running locally"></td></tr>
       <tr><td data-zh="音频直入" data-tw="音訊直入" data-en="Audio in"></td><td data-zh="Qwen3-Omni 30B-A3B，由一个模型同时听取与翻译；需要 64 GB，尚未在真实聚会中使用过" data-tw="Qwen3-Omni 30B-A3B，由一個模型同時聽取與翻譯；需要 64 GB，尚未在真實聚會中使用過" data-en="Qwen3-Omni 30B-A3B. One model both hears and translates. It needs 64 GB and has not yet run a live service"></td></tr>
-      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Kokoro，8 种普通话声音与 20 种美式英语声音；需要更佳音质时改用 Qwen3-TTS" data-tw="Kokoro，8 種普通話聲音與 20 種美式英語聲音；需要更佳音質時改用 Qwen3-TTS" data-en="Kokoro, with 8 Mandarin and 20 American English voices, or Qwen3-TTS when better quality is wanted"></td></tr>
+      <tr><td data-zh="语音合成" data-tw="語音合成" data-en="Voice"></td><td data-zh="Piper，在 CPU 上运行，不与翻译抢 GPU；需要更多声音时改用 Kokoro，需要更佳音质时改用 Qwen3-TTS" data-tw="Piper，在 CPU 上執行，不與翻譯搶 GPU；需要更多聲音時改用 Kokoro，需要更佳音質時改用 Qwen3-TTS" data-en="Piper, on the CPU so it never waits for the translator's GPU; Kokoro for a wider choice of voices, Qwen3-TTS for the best quality"></td></tr>
       <tr><td data-zh="广播" data-tw="廣播" data-en="Broadcast"></td><td data-zh="ffmpeg 转成 MP3，由 Python 标准库的 HTTP 服务器分发" data-tw="ffmpeg 轉成 MP3，由 Python 標準函式庫的 HTTP 伺服器分發" data-en="ffmpeg to MP3, distributed by Python's standard-library HTTP server"></td></tr>
       <tr><td data-zh="授权" data-tw="授權" data-en="Licence"></td><td>Apache 2.0</td></tr>
     </table>
@@ -331,20 +331,24 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
         <p class="kicker"><b>06</b> / <span data-zh="磁盘空间" data-tw="磁碟空間" data-en="Disk space"></span></p>
         <h2 data-zh="模型存在哪里" data-tw="模型存在哪裡" data-en="Where the models live"></h2>
       </div>
-      <p data-zh="第一次运行会下载约 4.3 GB，存放在用户目录而非项目文件夹，因此删除仓库并不会释放这些空间。在控制台中更换翻译模型时，首次选择也会下载该模型。8B 为 4.6 GB，35B 为 37.7 GB，音频直入的模型为 38.8 GB，且都不会替换已有的模型。"
-         data-tw="第一次執行會下載約 4.3 GB，存放在使用者目錄而非專案資料夾，因此刪除倉庫並不會釋放這些空間。在控制台中更換翻譯模型時，首次選擇也會下載該模型。8B 為 4.6 GB，35B 為 37.7 GB，音訊直入的模型為 38.8 GB，且都不會替換已有的模型。"
-         data-en="The first run downloads about 4.3 GB into your home directory rather than into the project folder, so deleting the repository reclaims none of it. Switching the translator in the console downloads that model the first time it is selected. The 8B is 4.6 GB, the 35B is 37.7 GB and the audio-in model is 38.8 GB, and none of them replaces what is already stored."></p>
+      <p data-zh="第一次运行会下载约 4 GB，存放在用户目录而非项目文件夹，因此删除仓库并不会释放这些空间。在控制台中更换翻译模型时，首次选择也会下载该模型。8B 为 4.6 GB，35B 为 37.7 GB，音频直入的模型为 38.8 GB，且都不会替换已有的模型。"
+         data-tw="第一次執行會下載約 4 GB，存放在使用者目錄而非專案資料夾，因此刪除倉庫並不會釋放這些空間。在控制台中更換翻譯模型時，首次選擇也會下載該模型。8B 為 4.6 GB，35B 為 37.7 GB，音訊直入的模型為 38.8 GB，且都不會替換已有的模型。"
+         data-en="The first run downloads about 4 GB into your home directory rather than into the project folder, so deleting the repository reclaims none of it. Switching the translator in the console downloads that model the first time it is selected. The 8B is 4.6 GB, the 35B is 37.7 GB and the audio-in model is 38.8 GB, and none of them replaces what is already stored."></p>
     </div>
 
     <table class="spec">
       <tr><td>~/.cache/huggingface/hub</td>
-          <td data-zh="识别、翻译、语音三个模型，约 4.3 GB，以及你另行选用的翻译模型或语音引擎"
-              data-tw="辨識、翻譯、語音三個模型，約 4.3 GB，以及你另行選用的翻譯模型或語音引擎"
-              data-en="The recognition, translation and voice models, about 4.3 GB, plus any translator or voice engine you have selected"></td></tr>
+          <td data-zh="识别与翻译模型，约 4 GB，以及你另行选用的翻译模型或语音引擎"
+              data-tw="辨識與翻譯模型，約 4 GB，以及你另行選用的翻譯模型或語音引擎"
+              data-en="The recognition and translation models, about 4 GB, plus any translator or voice engine you have selected"></td></tr>
       <tr><td>~/.cache/torch/hub</td>
           <td data-zh="Silero 语音活动检测，数 MB"
               data-tw="Silero 語音活動偵測，數 MB"
               data-en="Silero voice activity detection, a few MB"></td></tr>
+      <tr><td>~/.cache/piper-voices</td>
+          <td data-zh="Piper 的声音，每个约 60 MB，首次选用时下载"
+              data-tw="Piper 的聲音，每個約 60 MB，首次選用時下載"
+              data-en="Piper's voices, about 60 MB each, downloaded the first time one is selected"></td></tr>
     </table>
 
     <p class="prose lead-in"
@@ -356,12 +360,12 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
 hf cache ls                    <span class="c"># what is cached, and how big</span>
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/Kokoro-82M-bf16 \
             model/mlx-community/whisper-large-v3-turbo
 
 <span class="c"># only if you switched the translator or voice engine, or ran the audio-in engine;
 # hf cache ls above shows which of these you actually have</span>
-hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+hf cache rm model/mlx-community/Kokoro-82M-bf16 \
+            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
             model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit

@@ -53,7 +53,7 @@ const cascadeOnly = [...src.matchAll(/<label data-cascade-only>/g)].map(() => {
   return label;
 });
 // The voice picker, dimmed when the engine that has voices to pick is not the one running.
-const kokoroOnly = [...src.matchAll(/<label data-kokoro-only[^>]*>/g)].map(() => {
+const voiceOnly = [...src.matchAll(/<label data-voice-only[^>]*>/g)].map(() => {
   const label = el("label");
   label.children.push(byId.voice);
   label.querySelectorAll = () => [byId.voice];
@@ -71,7 +71,7 @@ const sandbox = {
     getElementById: (i) => byId[i] ?? el(),
     querySelector: () => el(),
     querySelectorAll: (sel) => (sel === "[data-cascade-only]" ? cascadeOnly
-      : sel === "[data-kokoro-only]" ? kokoroOnly
+      : sel === "[data-voice-only]" ? voiceOnly
       : sel === "[data-en]" ? dataEls
       : sel.startsWith("#langseg") ? [el("button"), el("button"), el("button")] : []),
     createElement: (t) => el(t),
@@ -201,10 +201,10 @@ if (cascadeOnly.some((l) => l.classList.contains("inert")))
 // others. Qwen3-TTS has a single voice of its own: nothing to pick, so the control goes grey.
 const voiceOptions = () => (byId.voice.innerHTML.match(/value="[^"]+"/g) ?? [])
   .map((m) => m.slice(7, -1));
-if (!kokoroOnly.every((l) => l.classList.contains("inert")))
+if (!voiceOnly.every((l) => l.classList.contains("inert")))
   errors.push("the voice picker stayed live under an engine with one voice");
 listeners.status({ data: JSON.stringify({ ...status, config: { ...status.config, tts: "kokoro" } }) });
-if (kokoroOnly.some((l) => l.classList.contains("inert")))
+if (voiceOnly.some((l) => l.classList.contains("inert")))
   errors.push("the voice picker was dimmed while Kokoro was running");
 if (!voiceOptions().every((v) => v.startsWith("z")) || voiceOptions().length !== 8)
   errors.push(`Chinese listeners were offered ${JSON.stringify(voiceOptions())}`);
@@ -212,6 +212,13 @@ listeners.status({ data: JSON.stringify({
   ...status, config: { ...status.config, tts: "kokoro", target: "en", voice: "af_heart" } }) });
 if (!voiceOptions().every((v) => v.startsWith("a")) || voiceOptions().length !== 20)
   errors.push(`English listeners were offered ${JSON.stringify(voiceOptions())}`);
+// ... and the other engine with voices offers its own names, not Kokoro's
+listeners.status({ data: JSON.stringify({
+  ...status, config: { ...status.config, tts: "piper", target: "en", voice: "en_US-ryan-medium" } }) });
+if (!voiceOptions().every((v) => v.startsWith("en_US-")) || voiceOptions().length < 2)
+  errors.push(`Piper listeners were offered ${JSON.stringify(voiceOptions())}`);
+if (voiceOnly.some((l) => l.classList.contains("inert")))
+  errors.push("the voice picker was dimmed while Piper was running");
 if (!byId.voicehint.textContent) errors.push("nothing explained which voices are offered");
 
 if (errors.length) {

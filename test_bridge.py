@@ -329,7 +329,9 @@ p1.open_mic()
 assert FakeSD.opened == "MacBook Pro Microphone", f"opened {FakeSD.opened!r}"
 del sys.modules["sounddevice"]
 p1.mic = None
-p1.cfg = dict(bridge.DEFAULTS)
+# Kokoro rather than the default engine: the voices below are its, and the engines have to
+# be able to carry a voice between them either way round.
+p1.cfg = dict(bridge.DEFAULTS, tts="kokoro", voice=bridge.DEFAULT_VOICE["kokoro"]["zh"])
 
 assert p1.update({"source": "auto"}) is True, "spoken language should need a restart"
 
@@ -341,23 +343,39 @@ restarted = threading.Event()
 p1.restart = restarted.set
 assert p1.update({"target": "en"}) is False, "the target change should restart automatically"
 assert restarted.wait(1), "changing output language left the wrong voice running"
-assert p1.cfg["voice"] == bridge.DEFAULT_VOICE["en"], f"kept {p1.cfg['voice']}"
+assert p1.cfg["voice"] == bridge.DEFAULT_VOICE["kokoro"]["en"], f"kept {p1.cfg['voice']}"
 p1.state = "stopped"
 # ... any other English voice, since the target change already left it on the default one
 assert p1.update({"voice": "af_heart"}) is True, "a voice is loaded when the pipeline starts"
-assert p1.update({"target": "zh"}) is True and p1.cfg["voice"] == bridge.DEFAULT_VOICE["zh"]
+assert p1.update({"target": "zh"}) is True and p1.cfg["voice"] == bridge.DEFAULT_VOICE["kokoro"]["zh"]
 assert p1.update({"voice": "am_michael"}) is False, "an American voice reading Chinese"
 assert p1.update({"voice": "zf_yunfei"}) is False, "a voice Kokoro does not ship"
 
-# the voice reaches Kokoro together with its own phonemiser, and only when Kokoro is the
-# engine: the pipeline registers --kokoro_* only for the backend that was selected, and
-# rejects the flag outright under Qwen3-TTS.
-p1.cfg = dict(bridge.DEFAULTS, voice="zm_yunxi")
+# a voice belongs to its engine as much as to its language: switching engines carries it
+# over the same way switching languages does, and neither engine will take the other's names
+assert p1.update({"tts": "piper"}) is True
+assert p1.cfg["voice"] == bridge.DEFAULT_VOICE["piper"]["zh"], f"kept {p1.cfg['voice']}"
+assert p1.update({"voice": "zm_yunyang"}) is False, "Piper cannot load a Kokoro voice"
+assert p1.update({"target": "en"}) is True and p1.cfg["voice"] == bridge.DEFAULT_VOICE["piper"]["en"]
+assert p1.update({"voice": "en_US-amy-medium"}) is True, "a Piper voice is loaded at startup too"
+# Qwen3-TTS has a voice of its own, so there is nothing to carry and nothing to reset
+assert p1.update({"tts": "qwen3"}) is True and p1.cfg["voice"] == "en_US-amy-medium"
+p1.update({"tts": "kokoro", "target": "zh"})
+
+# the voice reaches its engine the way that engine names it, and only when that engine is
+# the one selected: the pipeline registers a backend's flags only for the backend that was
+# selected, and rejects a stray one outright.
+p1.cfg = dict(bridge.DEFAULTS, tts="kokoro", voice="zm_yunxi")
 cmd = p1._command()
 assert cmd[cmd.index("--kokoro_voice") + 1] == "zm_yunxi"
 assert cmd[cmd.index("--kokoro_lang_code") + 1] == "z", "English phonemes for Chinese text"
+p1.cfg = dict(bridge.DEFAULTS, tts="piper", voice="zh_CN-huayan-medium")
+cmd = p1._command()
+assert cmd[cmd.index("--piper_voice") + 1] == "zh_CN-huayan-medium"
+assert "--kokoro_voice" not in cmd, "a Kokoro flag under Piper"
 p1.cfg["tts"] = "qwen3"
-assert "--kokoro_voice" not in p1._command(), "a flag Qwen3-TTS refuses to start with"
+assert "--kokoro_voice" not in p1._command() and "--piper_voice" not in p1._command(), \
+    "a flag Qwen3-TTS refuses to start with"
 p1.cfg = dict(bridge.DEFAULTS)
 
 # a hand-edited config.json with a bad value falls back instead of crashing at startup
@@ -365,8 +383,10 @@ bridge.CONFIG_PATH.write_text(json.dumps({"source": "klingon", "target": "en", "
 loaded = bridge.load_config()
 assert loaded["source"] == bridge.DEFAULTS["source"], "bad value survived load"
 assert loaded["target"] == "en" and loaded["chat_size"] == 3, "good values were dropped"
-# ...including a config saved before voices existed, whose default voice speaks the wrong one
-assert loaded["voice"] == bridge.DEFAULT_VOICE["en"], f"loaded {loaded['voice']}"
+# ...including a config saved before voices existed, whose default voice speaks the wrong
+# language, and whose engine is whichever one this version starts on
+assert loaded["voice"] == bridge.DEFAULT_VOICE[bridge.DEFAULTS["tts"]]["en"], \
+    f"loaded {loaded['voice']}"
 
 # a config written before 简体/繁體 was dropped still starts, quietly, on the same language
 for legacy in ("zh-Hans", "zh-Hant"):
@@ -572,6 +592,8 @@ assert subprocess.run(["ps", "-p", str(pid)], capture_output=True).returncode !=
 import types
 for name in ("speech_to_speech", "speech_to_speech.TTS", "speech_to_speech.TTS.kokoro_handler",
              "speech_to_speech.cli", "speech_to_speech.STT", "speech_to_speech.STT.base_stt_handler",
+             "speech_to_speech.backend_registry", "speech_to_speech.arguments_classes",
+             "speech_to_speech.arguments_classes.module_arguments",
              "mlx_audio", "mlx_audio.stt", "mlx_audio.stt.models",
              "mlx_audio.stt.models.whisper", "mlx_audio.stt.models.whisper.whisper"):
     sys.modules.setdefault(name, types.ModuleType(name))
@@ -588,6 +610,18 @@ sys.modules["speech_to_speech.TTS.kokoro_handler"].KokoroTTSHandler = FakeKokoro
 sys.modules["speech_to_speech.cli"].main = lambda: 0
 whisper_mod = sys.modules["mlx_audio.stt.models.whisper.whisper"]
 whisper_mod.Model = type("Model", (), {})
+# the pieces run_pipeline registers Piper with: the parser reads --tts's choices out of a
+# dataclass field built at import time, which is before the registration below
+import dataclasses
+registry_mod = sys.modules["speech_to_speech.backend_registry"]
+registry_mod.TTS_BACKENDS = {"kokoro": "spec", "qwen3": "spec"}
+registry_mod.BackendSpec = lambda *a, **kw: ("spec", a, kw)
+registry_mod._simple_handler_factory = lambda *a, **kw: ("factory", a, kw)
+@dataclasses.dataclass
+class FakeModuleArguments:
+    tts: str = dataclasses.field(default="qwen3",
+                                 metadata={"choices": tuple(registry_mod.TTS_BACKENDS)})
+sys.modules["speech_to_speech.arguments_classes.module_arguments"].ModuleArguments = FakeModuleArguments
 stt_mod = sys.modules["speech_to_speech.STT.base_stt_handler"]
 stt_mod.BaseSTTHandler = type("BaseSTTHandler", (), {
     "should_emit_output": lambda self, output: True,
@@ -614,6 +648,16 @@ assert run_pipeline.pick({"ja": .80, "en": .15, "zh": .05}) == "en"
 assert run_pipeline.pick({"ko": 1.0}) == "en", "nothing of ours scored; en is the fallback"
 # a language named on the command line is not a detection and must survive untouched
 assert run_pipeline._detect_language(None, None, language="zh") == "zh"
+
+# Piper is registered as a voice engine of our own, in a package that has never heard of it:
+# the backend has to reach the registry *and* the --tts choices, which were frozen before it
+# existed. Missing either one is a pipeline that will not start.
+assert "piper" in registry_mod.TTS_BACKENDS, "the pipeline was never told about Piper"
+assert "piper" in FakeModuleArguments.__dataclass_fields__["tts"].metadata["choices"], \
+    "--tts piper would be rejected before the backend is ever looked up"
+assert run_pipeline.PiperTTSHandlerArguments().piper_voice in \
+    [v for langs in bridge.VOICES["piper"].values() for v in langs], \
+    "the pipeline's default Piper voice is not one the console offers"
 
 # Whisper fills a clip with no speech in it by looping one word, and that would be
 # translated and spoken over the sermon. The tell is how well the text compresses.
