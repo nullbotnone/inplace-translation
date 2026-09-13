@@ -221,6 +221,17 @@ if (voiceOnly.some((l) => l.classList.contains("inert")))
   errors.push("the voice picker was dimmed while Piper was running");
 if (!byId.voicehint.textContent) errors.push("nothing explained which voices are offered");
 
+// Whisper re-transcribes a turn as the preacher keeps going; every pass carries the turn's
+// id, and the console revises the line it is showing rather than stacking up four of them.
+const nthLast = (n) => byId.log.children.at(-n).children[1].textContent;   // the log is capped
+listeners.line({ data: JSON.stringify({ kind: "src", text: "死亡的原因", at: "10:41:00", id: 91 }) });
+listeners.line({ data: JSON.stringify({ kind: "src", text: "死亡的原因是什么呢", at: "10:41:00", id: 91 }) });
+if (nthLast(1) !== "死亡的原因是什么呢") errors.push(`the console did not revise: ${nthLast(1)}`);
+if (nthLast(2) === "死亡的原因") errors.push("the console left the unfinished pass on screen");
+listeners.line({ data: JSON.stringify({ kind: "out", text: "What causes death?", at: "10:41:03", id: 92 }) });
+if (nthLast(1) !== "What causes death?" || nthLast(2) !== "死亡的原因是什么呢")
+  errors.push("the translation did not start its own line");
+
 if (errors.length) {
   console.error("console script failed:\n  " + errors.join("\n  "));
   process.exit(1);

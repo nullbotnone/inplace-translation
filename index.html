@@ -123,46 +123,120 @@
   // audio we hold and play slightly fast until it closes: the browser corrects the pitch, so
   // 6% is inaudible on speech and clears a second of lag in about twenty.
   const CHASE_ABOVE_S = 0.8, CAUGHT_UP_S = 0.4;
-  const chaseLiveEdge = () => {
+  // How far the playhead is behind the newest audio this phone holds. A reconnect leaves the
+  // old buffered range behind and starts a new one, so the range being played is the one to
+  // measure against -- the last range can be an abandoned one, and a gap of minutes read off
+  // it would mistime every subtitle for the rest of the service.
+  const bufferedEdge = () => {
     const held = audio.buffered;
-    if (audio.paused || !held || !held.length) return;
-    const behind = held.end(held.length - 1) - audio.currentTime;
+    if (!held || !held.length) return null;
+    for (let i = 0; i < held.length; i++)
+      if (audio.currentTime >= held.start(i) && audio.currentTime <= held.end(i))
+        return held.end(i);
+    return held.end(held.length - 1);
+  };
+  const behindLiveEdge = () => {
+    const edge = bufferedEdge();
+    return audio.paused || edge === null ? 0 : edge - audio.currentTime;
+  };
+  const chaseLiveEdge = () => {
+    const behind = behindLiveEdge();
+    if (!behind) return;
     if (behind > CHASE_ABOVE_S) audio.playbackRate = behind > 2 ? 1.1 : 1.06;
     else if (behind <= CAUGHT_UP_S) audio.playbackRate = 1;
   };
   setInterval(chaseLiveEdge, 1000);
   const connection = (state, text) => { $("connection").dataset.state = state; $("connectionText").textContent = text; };
-  const addLine = ({ kind, text, at }) => {
+  // A sentence takes seconds to say, so putting all of it on screen when its first word is
+  // spoken leaves the rest sitting there ahead of the voice -- which is what reads as the
+  // voice lagging the text. Reveal it as it is spoken instead. Chinese is counted by the
+  // character and English by the word, which is as close to speaking time as a clock can get
+  // without the voice telling us where it is.
+  //
+  // Measured against the voice's own clock rather than the wall's, because the two do not
+  // agree: this page plays 6% fast whenever it is catching up to the live edge, and stops
+  // altogether while a phone rebuffers. Both move currentTime and neither moves Date.now().
+  const PIECE = /[\u2e80-\u9fff\uff00-\uffef]|[^\s\u2e80-\u9fff\uff00-\uffef]+/g;
+  const MAX_REVEAL_S = 30, REVEAL_STEP_MS = 50;
+  const revealOver = (body, text, secs) => {
+    const pieces = [...text.matchAll(PIECE)];
+    const total = pieces.reduce((n, p) => n + p[0].length, 0);
+    if (!total) return (body.textContent = text);
+    const marks = [];                       // [when this piece starts, 0..1] and its end
+    let said = 0;
+    for (const piece of pieces) {
+      marks.push([said / total, piece.index + piece[0].length]);
+      said += piece[0].length;
+    }
+    const startedAt = audio.currentTime;
+    let next = 0;
+    const step = () => {
+      // Paused means nobody is listening to this line any more; show the rest of it.
+      const spoken = audio.paused ? 1 : (audio.currentTime - startedAt) / secs;
+      while (next < marks.length && marks[next][0] <= spoken) {
+        body.textContent = text.slice(0, marks[next][1]);
+        next += 1;
+      }
+      log.scrollTop = log.scrollHeight;
+      if (next >= marks.length) clearInterval(reveal);
+    };
+    const reveal = setInterval(step, REVEAL_STEP_MS);
+    step();
+  };
+  // Whisper re-transcribes a turn as the speaker keeps going, so a heard line arrives again
+  // and again with more of the sentence in it. The bridge gives every turn an id; a line
+  // whose id is already on screen revises what is there rather than repeating it.
+  const onScreen = new Map();
+  const addLine = ({ kind, text, at, secs, id }) => {
+    const showing = onScreen.get(id);
+    if (showing) { showing.textContent = text; log.scrollTop = log.scrollHeight; return; }
     log.querySelector(".empty")?.remove();
     const safeKind = kind === "src" ? "src" : "out";
     const item = document.createElement("li"), meta = document.createElement("div"), body = document.createElement("p");
-    item.dataset.kind = safeKind;
+    item.dataset.kind = safeKind; item.lineId = id;
     meta.className = "line-meta"; meta.textContent = `${at || "Live"} · ${safeKind === "src" ? "Heard / 原文" : "Translation / 翻译"}`;
-    body.className = safeKind; body.textContent = text; item.append(meta, body); log.appendChild(item);
-    while (log.children.length > 40) log.firstChild.remove();
+    body.className = safeKind;
+    const spoken = !audio.paused && secs > 0 && secs < MAX_REVEAL_S;
+    if (spoken) revealOver(body, text, secs); else body.textContent = text;
+    item.append(meta, body); log.appendChild(item);
+    if (id !== undefined) onScreen.set(id, body);
+    while (log.children.length > 40) { onScreen.delete(log.firstChild.lineId); log.firstChild.remove(); }
     log.scrollTop = log.scrollHeight; // every new line returns listeners to the live edge
   };
-  // The bridge publishes a line as its own audio starts down the wire, but this phone is
-  // playing whatever it buffered on the way in -- a second or two behind that. Only the
-  // phone knows how far, so hold the line by exactly its own lag. Same delay for every line,
-  // and never earlier than the one before it, so the order on screen is the order spoken.
-  // With audio off there is nothing to wait for and the text appears as it arrives.
-  const MAX_HOLD_S = 5;
-  let showAt = 0;
+  // The bridge publishes a line as its own audio starts down the wire, but this phone plays
+  // that audio later -- after whatever it buffered on the way in, and after whatever is
+  // already queued ahead of it. So the line's audio sits at a known place in the phone's own
+  // timeline: the end of what it holds right now. Show the line when the playhead gets
+  // there. That is a position, not a delay, so it survives a rebuffer, the 6% catch-up, and
+  // the seconds before playback has started at all -- where a delay measured against a
+  // stopped playhead is zero and puts the first line on screen before any audio exists.
+  //
+  // Only the translation waits: what was heard is not read out by anything, and it is the
+  // first sign on screen that the room is being heard.
+  const MAX_HOLD_S = 15, RELEASE_STEP_MS = 50;
+  const waiting = [];                     // [{ at: where in the audio this line is spoken }]
   const showWithVoice = (line) => {
-    const held = audio.buffered;
-    const behind = audio.paused || !held || !held.length ? 0
-      : Math.min(held.end(held.length - 1) - audio.currentTime, MAX_HOLD_S);
-    if (behind < 0.25) return addLine(line);
-    showAt = Math.max(Date.now() + behind * 1000, showAt + 50);
-    setTimeout(() => addLine(line), showAt - Date.now());
+    const edge = bufferedEdge();
+    if (line.kind !== "out" || edge === null || (audio.paused && !wantsAudio))
+      return addLine(line);               // nobody is listening; nothing to wait for
+    waiting.push({ at: edge, line, since: Date.now() });
   };
+  const releaseSpoken = () => {
+    // In order, always: the positions only ever grow, so the queue stays the order spoken.
+    // The deadline is for a phone that stopped playing without saying so -- a line that
+    // waits longer than any buffer could explain is better late than never.
+    while (waiting.length && (audio.currentTime >= waiting[0].at
+                              || (audio.paused && !wantsAudio)
+                              || Date.now() - waiting[0].since > MAX_HOLD_S * 1000))
+      addLine(waiting.shift().line);
+  };
+  setInterval(releaseSpoken, RELEASE_STEP_MS);
   const es = new EventSource("/subs");
   es.onopen = () => connection("live", "Live · 已连接");
   es.onerror = () => connection("offline", "Reconnecting · 重新连接中");
   es.onmessage = (event) => { try {
       const line = JSON.parse(event.data);
-      const signature = JSON.stringify([line.kind, line.text, line.at]);
+      const signature = JSON.stringify([line.kind, line.text, line.at, line.id]);
       if (seenLines.has(signature)) return; // reconnects replay the server's recent backlog
       seenLines.add(signature); seenOrder.push(signature);
       if (seenOrder.length > 80) seenLines.delete(seenOrder.shift());

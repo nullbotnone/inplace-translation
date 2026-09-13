@@ -38,9 +38,28 @@ p_ws.ws = [json.dumps(e) for e in (
     {"type": "response.output_audio_transcript.done", "transcript": "hi"},
     {"type": "response.output_audio.delta", "delta": b64(b"\5\6")},
 )]
+booked_first = []
+real_say_at, bridge.say_at = bridge.say_at, lambda *a: booked_first.append(a)
 p_ws._read_ws()
+bridge.say_at = real_say_at
 assert bridge.out_q.get_nowait() == b"\1\2\3\4", "a turn should arrive whole, not gust by gust"
 assert bridge.out_q.empty(), "audio for an unfinished turn should still be held"
+
+# a pipeline that hangs up -- it exited, or it was another copy on :8765 this bridge had
+# attached to -- must not leave the console saying "translating" over a dead socket
+p_dead = bridge.Pipeline()
+p_dead.state, p_dead.ws = "running", []
+p_dead._read_ws()
+assert p_dead.state == "error", "a closed pipeline socket left the bridge claiming to run"
+assert "restart" in p_dead.detail, f"the error does not say what to do: {p_dead.detail!r}"
+# the line is booked against the start of its own audio, with the length of it: the very
+# first turn of a session starts at position 0, which is a position like any other
+at, kind, text, secs = booked_first[0]
+# the audio starts at 0 and the line is booked a delivery lag later: the listener's socket
+# does not see a byte at the moment the encoder is handed it
+lag = bridge.DELIVERY_LAG_MS * bridge.RATE * 2 // 1000
+assert (at, kind, text) == (lag, "out", "hi"), f"booked {booked_first[0]}"
+assert secs == 4 / (bridge.RATE * 2), f"the voice's own length was lost: {secs}"
 
 # ... but only up to the lead: a long turn starts playing while the rest is still being
 # spoken, instead of the listener waiting out the whole turn first
@@ -92,6 +111,53 @@ bridge.say_at(first, "out", "第二句")
 assert [l["text"] for l in bridge.recent] == ["第二句"], "an already-spoken position waited"
 bridge.recent.clear()
 
+# a queue that runs dry mid-turn puts silence inside a word. The bridge buffers more of the
+# voice next time rather than leaving a volunteer to tune milliseconds by ear during a sermon.
+import io, contextlib
+p_lead = bridge.Pipeline()
+p_lead.cfg = dict(bridge.DEFAULTS)
+bridge.speaking.set()
+run_pacer(0.3)                                   # the voice runs out mid-turn
+bridge.speaking.clear()
+assert bridge.ran_dry.is_set(), "a starving voice went unnoticed"
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    p_lead.tune_lead()
+assert p_lead.extra_lead == bridge.LEAD_STEP_MS, f"buffer stayed at {p_lead.extra_lead}"
+assert "ran out mid-sentence" in said.getvalue(), f"said nothing: {said.getvalue()!r}"
+assert not bridge.ran_dry.is_set(), "the same gap would be counted twice"
+# ... and gives it back over turns that did not need it
+p_lead.tune_lead()
+assert p_lead.extra_lead == bridge.LEAD_STEP_MS - bridge.LEAD_DECAY_MS, \
+    f"buffer not handed back: {p_lead.extra_lead}"
+# ... silence between turns is not the voice running out
+run_pacer(0.2)
+assert not bridge.ran_dry.is_set(), "a pause between turns counted as a gap"
+for _ in range(20):
+    p_lead.tune_lead()
+assert p_lead.extra_lead == 0, "the added buffer never fully went away"
+# ... and it cannot grow without bound
+bridge.speaking.set()
+for _ in range(20):
+    bridge.ran_dry.set()
+    with contextlib.redirect_stdout(io.StringIO()):
+        p_lead.tune_lead()
+bridge.speaking.clear()
+assert p_lead.extra_lead == bridge.LEAD_MAX_MS, f"grew to {p_lead.extra_lead}"
+
+# a subtitle waits for the voice, so a voice that will never arrive must not take the words
+# with it: a dead encoder, or a pipeline being stopped, publishes what was still booked
+bridge.recent.clear()
+bridge.say_at(bridge.queued_bytes + 10 ** 9, "out", "无人听见的话")
+bridge.broadcast_died("the audio encoder went away: test")
+assert [l["text"] for l in bridge.recent] == ["无人听见的话"], \
+    f"a dead encoder swallowed the translation: {bridge.recent}"
+bridge.recent.clear()
+bridge.say_at(bridge.queued_bytes + 10 ** 9, "out", "最后一句")
+bridge.Pipeline().stop()
+assert [l["text"] for l in bridge.recent] == ["最后一句"], "stopping swallowed the last line"
+bridge.recent.clear()
+
 # backlog past MAX_LAG_S is dropped rather than drifting forever
 for _ in range(int(bridge.MAX_LAG_S * bridge.RATE * 2 / 640) + 10):
     bridge.out_q.put(b"\1" * 640)
@@ -125,17 +191,55 @@ assert not f.qs, "subscribe() did not clean up on exit"
 bridge.recent.clear()
 with bridge.subs.subscribe() as phone, bridge.events.subscribe() as console:
     bridge.subtitle("src", " For God so loved the world ")
-    bridge.subtitle("out", "神爱世人")
+    bridge.subtitle("out", "神爱世人", 4.6)
     bridge.subtitle("out", "   ")                        # blank turns are not broadcast
     first = json.loads(phone.get_nowait().decode().removeprefix("data: "))
-    assert first == {"kind": "src", "text": "For God so loved the world", "at": first["at"]}
-    assert json.loads(phone.get_nowait().decode().removeprefix("data: "))["text"] == "神爱世人"
+    assert first == {"kind": "src", "text": "For God so loved the world",
+                     "at": first["at"], "secs": 0, "id": first["id"]}
+    # the phone reveals a line over the time the voice takes to say it, so it is sent that
+    translated = json.loads(phone.get_nowait().decode().removeprefix("data: "))
+    assert (translated["text"], translated["secs"]) == ("神爱世人", 4.6)
     assert phone.empty(), "empty subtitle was broadcast"
     assert [n for n, _ in [console.get_nowait(), console.get_nowait()]] == ["line", "line"]
 assert len(bridge.recent) == 2, "backlog not kept"
 for _ in range(20):
     bridge.subtitle("out", "x")
 assert len(bridge.recent) == 8, "backlog not capped"
+
+# Whisper re-transcribes a turn as the speaker keeps going, correcting earlier words as it
+# goes, and each pass arrives as a finished transcription. One line on screen, revised.
+bridge.recent.clear()
+bridge.heard_turn = None
+with bridge.subs.subscribe() as phone:
+    bridge.subtitle("src", "死亡的原因是什么呢")
+    bridge.subtitle("src", "死亡的原因是什么呢表面上来看人有千百种死亡的原因")
+    bridge.subtitle("src", "死亡的原因是什么呢表面上来看人有千百种死亡的原因疾病战争")
+    sent = [json.loads(q.decode().removeprefix("data: ")) for q in list(phone.queue)]
+assert len(bridge.recent) == 1, f"one turn became {len(bridge.recent)} lines"
+assert bridge.recent[0]["text"].endswith("疾病战争"), "the backlog kept an unfinished pass"
+assert len({l["id"] for l in sent}) == 1, "a revision arrived under a new id"
+assert [l["text"] for l in sent][-1].endswith("疾病战争")
+# ... and its translation is its own line, not a revision of what was heard
+bridge.subtitle("out", "What is the cause of death?")
+assert len(bridge.recent) == 2, "the translation replaced the line it translates"
+assert bridge.recent[0]["id"] != bridge.recent[1]["id"], "heard and translated share an id"
+bridge.recent.clear(); bridge.heard_turn = None
+bridge.subtitle("src", "死亡的原因是什么呢")
+
+# ... a different sentence is a different line
+bridge.subtitle("src", "我们一起翻到第二章")
+assert len(bridge.recent) == 2, "a new sentence was folded into the last one"
+# ... and the translation closes the turn: what follows is never a revision of it
+bridge.subtitle("out", "We turn to chapter two.")
+bridge.subtitle("src", "我们一起翻到第二章吧")
+assert len(bridge.recent) == 4, f"a new turn revised a spoken one: {len(bridge.recent)}"
+# a correction inside the sentence is still the same turn, not a new one
+bridge.recent.clear(); bridge.heard_turn = None
+bridge.subtitle("src", "疾病战正自然在嗨")
+bridge.subtitle("src", "疾病战争自然在嗨也可能")
+assert len(bridge.recent) == 1, "a corrected word started a new line"
+assert bridge.recent[0]["text"] == "疾病战争自然在嗨也可能"
+bridge.recent.clear(); bridge.heard_turn = None
 
 # the prompt names the actual direction, so the model is not left guessing
 en2zh = {**bridge.DEFAULTS, "source": "en", "target": "zh"}

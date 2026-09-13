@@ -102,6 +102,13 @@ available for your environment:
 If you hit that, `rm -rf .venv` and rebuild it with `python3.12`. `start.sh` checks the
 version at startup so it cannot bite you twice.
 
+**One pipeline at a time.** The bridge starts `run_pipeline.py` only if nothing is already
+listening on port 8765, and otherwise attaches to what is there — which is what lets you
+restart the bridge without waiting for the models to load again. The cost is that a stray
+pipeline from another window is the one your sermon goes through, whatever it was configured
+for. If that copy exits, the bridge now says `[error] the pipeline closed the connection`
+rather than sitting there claiming to translate.
+
 macOS will ask Terminal for microphone permission the first time `bridge.py` runs. If the
 prompt never appears, grant it by hand in System Settings → Privacy & Security → Microphone.
 
@@ -276,6 +283,13 @@ All of this lives in the console; the notes below are why each one is there.
   delay rather than as stuttering. It is also pure delay on every turn, so the default is
   400 ms: Piper does not touch the GPU and has no gusts to cover. Raise it if the audio chops
   under Kokoro or Qwen3-TTS, lower it if the voice lags behind the preacher; tune it by ear.
+  You do not have to catch it by ear, and you do not have to fix it by hand. A turn is
+  several sentences, and the translator writes each one only as the one before it is being
+  spoken; when it takes longer than the buffer holds, the voice runs out in the middle of the
+  utterance. The bridge notices, says `!! the voice ran out mid-sentence; buffering 650 ms`,
+  and keeps the extra buffer until a run of turns shows it is no longer needed. Your setting
+  is the floor it starts from, so lowering it stays worth doing — it just cannot cost you a
+  stuttering voice for the rest of the service.
 
   Listeners' phones add a delay of their own — a browser buffers a second or two while it
   joins the stream, and since the stream never stops, nothing makes it up again. The listener
@@ -286,11 +300,31 @@ All of this lives in the console; the notes below are why each one is there.
   existed runs seconds ahead of the voice reading it. Each line is therefore booked against
   the position in the audio stream where its own sentence begins, and published when the
   voice reaches it: measured against a live pipeline, that is between 3 and 11 seconds
-  earlier in the stream than the moment the text arrived. Nothing queued means nothing to
-  wait for, so the first sentence after a pause is not held back at all.
+  earlier in the stream than the moment the text arrived, plus the tenth of a second the
+  encoder and the socket take to hand those bytes to a listener. Nothing queued means nothing
+  to wait for, so the first sentence after a pause is not held back at all.
 
-  The phone then holds each line by however far its own playback is behind the live edge,
-  which is the part only the phone can know. With audio off, the text appears as it arrives.
+  What the preacher said is not held at all — nothing is reading it out, and it is the first
+  sign on screen that the room is being heard. Only the translation waits for its voice, so
+  a heard line can sit above the translation of the sentence before it.
+
+  A heard line also grows. Whisper does not transcribe a turn once: it transcribes what it
+  has so far, then the whole thing again as the preacher keeps going, correcting earlier
+  words on the way. Each pass arrives as a finished transcription of its own, so a single
+  sentence would fill the transcript four times over. Passes that are recognisably the same
+  turn carry one id, and the screen revises the line it is already showing.
+
+  The phone then holds each line until its own playback reaches the point in the audio where
+  that line is spoken — the end of what it holds when the line arrives, which is a position
+  in its own timeline rather than a delay on a clock, so a rebuffer, the catch-up, and the
+  seconds before playback has even started cannot move it. It reveals the line as it is
+  spoken rather than all at once — a sentence takes seconds to say, and the rest of it on screen ahead of the voice
+  is most of what reads as lag. Each line is sent with the length of its own audio, and the
+  phone spreads the words across it, by the character in Chinese and by the word in English,
+  clocked by the audio itself rather than by the wall: the page plays 6% fast whenever it is
+  catching up to the live edge and stops dead while it rebuffers, and the words do both with
+  it. With audio off, the text appears whole as it arrives, and so does the backlog a phone
+  joining mid-sermon is sent.
 
 ## What this is not
 

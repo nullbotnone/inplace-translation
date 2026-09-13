@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 VOICES_DIR = Path.home() / ".cache/piper-voices"
 RATE = 16000                      # what the pipeline passes around; many Piper voices are 22050
+# Piper puts silence either side of every sentence -- measured at 45 ms before and 180 ms
+# after, on three Chinese sentences. Played back to back that is dead air the preacher is
+# talking over, and it stretches the sentence the subtitle is timed against: the bridge times
+# a line by the length of its audio, silence included, so the words trail the voice. Trim it,
+# leaving enough that sentences do not run into each other.
+SILENCE = 0.01                    # below this is not speech
+KEEP_MS = 60                      # ... of it, either side
 
 
 class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
@@ -127,12 +134,25 @@ class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
         # pipeline started. Nothing mid-sermon can change it, so language_code is not read.
         yield from self._speak(tts_input.text)
 
+    @staticmethod
+    def _trim(audio: np.ndarray, rate: int) -> np.ndarray:
+        """Silence off both ends, a little of it left. Audio with no speech in it is left
+        alone: a whisper the threshold cannot see is still the sermon."""
+        loud = np.abs(audio) > SILENCE
+        if not loud.any():
+            return audio
+        keep = int(KEEP_MS * rate / 1000)
+        start = max(0, int(np.argmax(loud)) - keep)
+        end = min(len(audio), len(audio) - int(np.argmax(loud[::-1])) + keep)
+        return audio[start:end]
+
     def _speak(self, sentence: str) -> Iterator[np.ndarray]:
         from scipy.signal import resample_poly
 
         generation = self.cancel_scope.generation if self.cancel_scope else None
         for chunk in self.voice.synthesize(sentence, self.syn_config):
-            audio = resample_poly(chunk.audio_float_array, *self.resample)
+            audio = resample_poly(self._trim(chunk.audio_float_array, chunk.sample_rate),
+                                  *self.resample)
             # Piper normalizes to [-1, 1]. 32768 would wrap an exact positive peak around to
             # -32768 when cast to int16, leaving a sharp click in otherwise clean speech.
             audio = (np.clip(audio, -1.0, 1.0) * np.iinfo(np.int16).max).astype(np.int16)

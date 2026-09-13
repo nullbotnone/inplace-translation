@@ -772,8 +772,18 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// Whisper re-transcribes a turn as the preacher keeps going: the same sentence arrives
+// again with more of it each time, under the same id from the bridge. Revise the line that
+// is already on screen instead of stacking up four versions of one sentence.
+const onScreen = new Map();
 function addLine(line) {
   const log = $("log");
+  const showing = onScreen.get(line.id);
+  if (showing) {
+    showing.textContent = line.text;
+    if (log.scrollHeight - log.scrollTop - log.clientHeight < 40) log.scrollTop = log.scrollHeight;
+    return;
+  }
   log.querySelector(".empty")?.remove();
   const li = document.createElement("li");
   const tag = document.createElement("div");
@@ -789,8 +799,10 @@ function addLine(line) {
   // stay pinned to the newest line, unless the operator has scrolled up to read something
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   li.append(tag, body);
+  li.lineId = line.id;
   log.appendChild(li);
-  while (log.children.length > 30) log.firstChild.remove();
+  if (line.id !== undefined) onScreen.set(line.id, body);
+  while (log.children.length > 30) { onScreen.delete(log.firstChild.lineId); log.firstChild.remove(); }
   if (atBottom) log.scrollTop = log.scrollHeight;
 }
 
