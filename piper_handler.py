@@ -17,7 +17,7 @@ A voice is one ~60 MB onnx file plus its config, downloaded on first use into
 from __future__ import annotations
 
 import logging
-from math import gcd
+from math import gcd, isfinite
 from pathlib import Path
 from threading import Event
 from typing import Any, Iterator, Optional
@@ -33,7 +33,7 @@ from speech_to_speech.pipeline.speculative_turns import SpeculativeTurnTracker
 logger = logging.getLogger(__name__)
 
 VOICES_DIR = Path.home() / ".cache/piper-voices"
-RATE = 16000                      # what the pipeline passes around; Piper's voices are 22050
+RATE = 16000                      # what the pipeline passes around; many Piper voices are 22050
 
 
 class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
@@ -50,9 +50,18 @@ class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
         cancel_scope: CancelScope | None = None,
         speculative_turns: SpeculativeTurnTracker | None = None,
     ) -> None:
-        from piper import PiperVoice, SynthesisConfig
+        try:
+            from piper import PiperVoice, SynthesisConfig
+        except ImportError as exc:
+            raise ImportError(
+                "Piper needs its extra package. Activate .venv and run: pip install piper-tts"
+            ) from exc
         from piper.download_voices import download_voice
 
+        if not isfinite(speed) or speed <= 0:
+            raise ValueError("--piper_speed must be a finite number greater than zero")
+        if blocksize <= 0:
+            raise ValueError("--piper_blocksize must be greater than zero")
         self.should_listen = should_listen
         self.blocksize = blocksize
         self.cancel_scope = cancel_scope
@@ -63,11 +72,21 @@ class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
 
         directory = Path(voices_dir) if voices_dir else VOICES_DIR
         directory.mkdir(parents=True, exist_ok=True)
-        if not (directory / f"{voice}.onnx").exists():
+        model_path = directory / f"{voice}.onnx"
+        config_path = directory / f"{voice}.onnx.json"
+        # Piper needs both files. Checking only the model hides a half-finished download until
+        # PiperVoice.load fails with an opaque missing-config error on the first sermon.
+        if not model_path.is_file() or not config_path.is_file():
             logger.info("Downloading Piper voice %s into %s", voice, directory)
-            download_voice(voice, directory)
+            try:
+                download_voice(voice, directory)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Could not download Piper voice {voice!r}. Check the internet connection "
+                    "and try starting again."
+                ) from exc
 
-        self.voice = PiperVoice.load(directory / f"{voice}.onnx", download_dir=directory)
+        self.voice = PiperVoice.load(model_path, download_dir=directory)
         # 22050 -> 16000 is 320/441. Ask gcd rather than hard-coding it: the x_low voices are
         # already at 16000, where this becomes the no-op it should be.
         source_rate = self.voice.config.sample_rate
@@ -114,7 +133,9 @@ class PiperTTSHandler(BaseHandler[TTSIn, TTSOut]):
         generation = self.cancel_scope.generation if self.cancel_scope else None
         for chunk in self.voice.synthesize(sentence, self.syn_config):
             audio = resample_poly(chunk.audio_float_array, *self.resample)
-            audio = (audio * 32768).astype(np.int16)
+            # Piper normalizes to [-1, 1]. 32768 would wrap an exact positive peak around to
+            # -32768 when cast to int16, leaving a sharp click in otherwise clean speech.
+            audio = (np.clip(audio, -1.0, 1.0) * np.iinfo(np.int16).max).astype(np.int16)
             for start in range(0, len(audio), self.blocksize):
                 if generation is not None and self.cancel_scope is not None \
                         and self.cancel_scope.is_stale(generation):

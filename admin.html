@@ -571,7 +571,8 @@ function paint() {
       // af_heart -> "Heart · female"; en_US-ryan-medium -> "Ryan". Piper's names carry the
       // language and the model size, neither of which is a choice being made here.
       const piper = v.includes("-");
-      const name = (piper ? v.split("-")[1] : v.slice(3)).replace(/^./, (c) => c.toUpperCase());
+      const name = (piper ? v.split("-")[1] : v.slice(3))
+        .replace(/_/g, " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
       const gender = piper ? "" : ` · ${t(v[1] === "f" ? "female" : "male")}`;
       return `<option value="${v}">${name}${gender}</option>`;
     }).join("");

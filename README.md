@@ -317,7 +317,7 @@ in the same cache even though it runs from `.venv-omni`.
 |---|---|
 | `~/.cache/huggingface/hub` | recognition and translation models, ~4 GB, plus any translator or voice engine you switched to |
 | `~/.cache/torch/hub` | Silero voice activity detection, a few MB |
-| `~/.cache/piper-voices` | Piper's voices, ~60 MB each, downloaded the first time one is selected. `rm -rf` it to clear them |
+| `~/.cache/piper-voices` | Piper's voices, ~60 MB each, downloaded the first time one is selected |
 
 To clear them, activate this project's environment and remove them by name:
 
@@ -338,6 +338,10 @@ hf cache rm model/mlx-community/Kokoro-82M-bf16 \
             model/pipecat-ai/smart-turn-v3
 
 hf cache prune                 # half-finished downloads
+
+# remove one Piper voice and its required config, if you no longer use it
+rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
+      ~/.cache/piper-voices/zh_CN-huayan-medium.onnx.json
 ```
 
 **Do not just `rm -rf ~/.cache/huggingface`.** That directory is shared by every Hugging Face

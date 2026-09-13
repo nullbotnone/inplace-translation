@@ -370,7 +370,11 @@ hf cache rm model/mlx-community/Kokoro-82M-bf16 \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit
 
-hf cache prune                 <span class="c"># half-finished downloads</span></code></pre>
+hf cache prune                 <span class="c"># half-finished downloads</span>
+
+<span class="c"># remove one Piper voice and its required config, if you no longer use it</span>
+rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
+      ~/.cache/piper-voices/zh_CN-huayan-medium.onnx.json</code></pre>
 
     <p class="warn-note"
        data-zh="请勿直接删除整个 ~/.cache/huggingface。这台 Mac 上所有 Hugging Face 工具共用该目录，其中很可能还有你其他工作的模型。请先运行 hf cache ls 查看，并可加上 --dry-run 预览将要删除的内容。"

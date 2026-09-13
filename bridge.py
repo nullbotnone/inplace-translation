@@ -443,10 +443,9 @@ class Pipeline:
 
     def _command(self):
         c = self.cfg
-        # Only when Kokoro is the voice: the pipeline registers a backend's flags only for
-        # the backend that was selected, so a stray --kokoro_* under Qwen3-TTS is a startup
-        # error. The lang code is the voice name's own first letter, so the phonemiser and
-        # the voice can never disagree.
+        # Only pass flags for the selected voice backend: a stray --kokoro_* or --piper_*
+        # under Qwen3-TTS is a startup error. Kokoro's language code is the voice name's own
+        # first letter, so the phonemiser and the voice can never disagree.
         voice = (["--kokoro_voice", c["voice"], "--kokoro_lang_code", c["voice"][0]]
                  if c["tts"] == "kokoro" else
                  ["--piper_voice", c["voice"]] if c["tts"] == "piper" else [])
@@ -653,7 +652,7 @@ class Pipeline:
             self.apply_instructions()
         events.publish(("status", self.status()))
         restart_required = bool(NEEDS_RESTART & set(changed))
-        # A target, Kokoro voice, or voice engine change leaves a running pipeline speaking
+        # A target, selected voice, or voice-engine change leaves a running pipeline speaking
         # with a model that cannot pronounce its new output. Restart it immediately instead
         # of briefly sending English text to the already-loaded Chinese phonemiser and asking
         # the operator to notice and press Restart separately.
