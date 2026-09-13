@@ -544,6 +544,16 @@ function paint() {
   const s = current;
   if (linkLost) { $("state").dataset.s = "error"; $("statetext").textContent = t("nolink"); }
   else if (s) { $("state").dataset.s = s.state; $("statetext").textContent = t(s.state); }
+
+  // Before the first status there is nothing to command, so no button is live -- and the
+  // state a button would undo has to be known: Stop on a stopped pipeline does nothing.
+  const state = s ? s.state : "stopped";
+  const dead = linkLost || !s || busyAction !== null;
+  $("startbtn").disabled = dead || state === "running" || state === "starting";
+  $("stopbtn").disabled = dead || state === "stopped";
+  $("restartbtn").disabled = dead || state === "starting";
+  ["startbtn", "stopbtn", "restartbtn"].forEach((id) =>
+    $(id).setAttribute("aria-busy", String(busyAction === id)));
   if (!s) return;
 
   const from = LANGNAME[lang][s.config.source], into = LANGNAME[lang][s.config.target];
@@ -613,12 +623,6 @@ function paint() {
   $("levelhint").textContent = micState;
   $("micbrief").textContent = s.state !== "running" ? t("micstandby")
     : s.level < .02 ? t("micnone") : s.level > .92 ? t("micloud") : t("micokbrief");
-
-  $("startbtn").disabled = linkLost || busyAction !== null || s.state === "running" || s.state === "starting";
-  $("stopbtn").disabled = linkLost || busyAction !== null || s.state === "stopped";
-  $("restartbtn").disabled = linkLost || busyAction !== null || s.state === "starting";
-  ["startbtn", "stopbtn", "restartbtn"].forEach((id) =>
-    $(id).setAttribute("aria-busy", String(busyAction === id)));
 
   // Don't fight the operator's cursor: only fill fields they aren't editing.
   CFG.forEach((key) => {

@@ -37,7 +37,7 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 
 | | |
 |---|---|
-| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Piper is the default stack; its models download at ~4 GB, plus runtime caches |
+| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Kokoro is the default stack; its models download at ~4 GB, plus runtime caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
 | Book names right | **64 GB+**, which buys the 35 B translator — the only one that gets 约翰二书 right — and the optional omni engine |
 | Disk | ~6 GB: 4 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 37.7 GB, and the omni engine another 38.8 GB |
@@ -249,9 +249,11 @@ All of this lives in the console; the notes below are why each one is there.
   rather than translating it.
 - **Pause before translating** — if the preacher pauses mid-sentence and gets chopped, raise it
   to around 300 ms so clauses stay together.
-- **Voice engine** — Piper is the default, and the reason is the GPU rather than the clock.
-  It runs on the CPU, so unlike the other two it never waits for the translator to let go —
-  and during a sermon the translator always has it. One sentence of English, on this Mac:
+- **Voice engine** — Kokoro is the default: eight Mandarin voices, twenty American English
+  ones, and it keeps up with the preacher as long as the translator leaves it room. Piper is
+  the one to switch to when it does not. Piper runs on the CPU, so unlike the other two it
+  never waits for the translator to let go — and during a sermon the translator often has it.
+  One sentence of English, on this Mac:
 
   | | Piper | Kokoro |
   |---|---|---|
@@ -267,10 +269,8 @@ All of this lives in the console; the notes below are why each one is there.
   read pinyin through g2pW, which is `pip install 'piper-tts[zh]'` and a 113 MB download on
   top, so they are not offered.
 
-  Kokoro is where the choice of Chinese voices is: eight of them, and it keeps up with the
-  preacher too as long as the translator leaves it room. Qwen3-TTS sounds better than either
-  and is the slowest; switch to it if the room can spare the speed, and back if `!! backlog,
-  dropping audio` appears.
+  Qwen3-TTS sounds better than either and is the slowest; switch to it if the room can spare
+  the speed, and back if `!! backlog, dropping audio` appears.
 - **Voice** — Kokoro and Piper; Qwen3-TTS has one voice of its own and the setting greys out.
   Kokoro offers eight Mandarin voices and twenty American English ones, female and male;
   Piper five English and one Chinese. The list follows what
