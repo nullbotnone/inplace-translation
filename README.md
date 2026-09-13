@@ -104,3 +104,11 @@ node check_console.js
 
 For ordinary use, the operator console is the manual. If something unusual happens,
 open the [technical guide](TECHNICAL_GUIDE.md) and check `sermon.log`.
+
+## Licence
+
+[Apache License 2.0](LICENSE), copyright 2026 Jie Li. You may use, modify, and
+redistribute this project, including in a commercial setting, provided you keep the
+notice and state your changes. It comes with no warranty. The models,
+`speech-to-speech`, and the voice engines carry their own licences; check those before
+redistributing anything built on them.
