@@ -37,10 +37,10 @@ Apple Silicon only. Everything runs through MLX; there is no CUDA path here.
 
 | | |
 |---|---|
-| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Qwen3-TTS is ~7.5 GB of weights, plus caches |
+| Minimum | M1/M2 with **16 GB** unified memory — Whisper + Qwen3-4B + Kokoro is the default stack; its models download at ~4.3 GB, plus runtime caches |
 | Comfortable | M2 Pro / M4 with **24–32 GB**, which buys you the 8 B translator |
 | Book names right | **64 GB+**, which buys the 35 B translator — the only one that gets 约翰二书 right — and the optional omni engine |
-| Disk | ~9 GB: 6.6 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 35 GB, and the omni engine another 36 GB |
+| Disk | ~6 GB: 4.3 GB of models plus a 1.8 GB virtualenv. The 35 B translator adds 37.7 GB, and the omni engine another 38.8 GB |
 
 Plug the laptop in and run it from the wall. A 40-minute sermon is 40 minutes of sustained
 MLX inference; on battery the Mac throttles and the translation falls behind.
@@ -67,7 +67,7 @@ mlx than the pipeline is pinned to. Skip this unless you want it:
 ```bash
 python3 -m venv .venv-omni
 .venv-omni/bin/pip install mlx-vlm
-.venv-omni/bin/hf download mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit   # 36 GB
+.venv-omni/bin/hf download mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit   # 38.8 GB
 ```
 
 **Prefer somewhere outside Documents, Desktop and Downloads.** macOS protects those three

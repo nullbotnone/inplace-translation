@@ -26,7 +26,7 @@ OMNI_MODEL = "mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit"
 OMNI_PYTHON = HERE / ".venv-omni/bin/python"   # mlx-vlm needs its own venv; see README
 MIC_DEAD_S = 3                    # no callback for this long means the input is gone
 LOAD_TIMEOUT_S = 3600             # the port stays shut until the models are downloaded, and
-                                  # the 35B option is a 35 GB first run. A pipeline that dies
+                                  # the 35B option is a 37.7 GB first run. A pipeline that dies
                                   # is caught by poll(), so this only backstops a live hang.
 
 # run_pipeline.py is the `speech-to-speech serve` command with one patch applied; see there.
@@ -385,7 +385,7 @@ class Pipeline:
             # The translator model is not loaded in this mode -- the audio model is doing
             # that job -- so naming its download size here would just be wrong.
             return "loading the voice"
-        size = "35 GB" if "35B" in self.cfg["model"] else "6.6 GB"
+        size = "37.7 GB" if "35B" in self.cfg["model"] else "4.3 GB"
         return f"loading models (first run downloads ~{size})"
 
     def _start_omni(self):
@@ -397,7 +397,7 @@ class Pipeline:
         if not OMNI_PYTHON.exists():
             raise RuntimeError(f"{OMNI_PYTHON} is missing -- see the README for the one-time "
                                f"setup of the audio model's venv")
-        self._set("starting", "loading the audio model (36 GB)")
+        self._set("starting", "loading the audio model (38.8 GB)")
         self.omni = subprocess.Popen([str(OMNI_PYTHON), "-m", "mlx_vlm.server",
                                       "--model", OMNI_MODEL, "--port", str(OMNI_PORT)],
                                      cwd=HERE, stdout=subprocess.DEVNULL,

@@ -225,7 +225,7 @@
       <li data-zh="16 GB 内存（35B 要 64 GB）" data-tw="16 GB 記憶體（35B 要 64 GB）" data-en="16 GB memory (64 GB for the 35B)"></li>
       <li data-zh="USB 音频接口" data-tw="USB 音訊介面" data-en="USB audio interface"></li>
       <li data-zh="Python 3.12" data-tw="Python 3.12" data-en="Python 3.12"></li>
-      <li data-zh="约 6.6 GB 模型下载" data-tw="約 6.6 GB 模型下載" data-en="~6.6 GB of model downloads"></li>
+      <li data-zh="约 4.3 GB 模型下载" data-tw="約 4.3 GB 模型下載" data-en="~4.3 GB of model downloads"></li>
     </ul>
 
 <pre><code>brew install ffmpeg python@3.12   <span class="c"># 3.13+ will not resolve</span>
@@ -246,9 +246,9 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
        data-en="After this one setup, each Sunday begins with a double-click on Start Translation.command in Finder. A Terminal window opens and the console appears in the browser on its own, with nothing to type. Closing the window stops the translation and releases the memory the models were holding."></p>
 
     <p class="prose"
-       data-zh="若希望系统登录后自行启动，README 中提供了一个 LaunchAgent。实验性的音频直入引擎也记在那里，它需要另建一个虚拟环境，并再下载 36 GB 模型。除非你有 64 GB 的 Mac 并打算试用，否则可以先不安装。"
-       data-tw="若希望系統登入後自行啟動，README 中提供了一個 LaunchAgent。實驗性的音訊直入引擎也記在那裡，它需要另建一個虛擬環境，並再下載 36 GB 模型。除非你有 64 GB 的 Mac 並打算試用，否則可以先不安裝。"
-       data-en="If you would rather the system started by itself, the README describes a LaunchAgent. It also covers the experimental audio-in engine, which needs a second virtualenv and a further 36 GB of model. Leave that engine aside unless you have a 64 GB Mac and wish to test it."></p>
+       data-zh="若希望系统登录后自行启动，README 中提供了一个 LaunchAgent。实验性的音频直入引擎也记在那里，它需要另建一个虚拟环境，并再下载 38.8 GB 模型。除非你有 64 GB 的 Mac 并打算试用，否则可以先不安装。"
+       data-tw="若希望系統登入後自行啟動，README 中提供了一個 LaunchAgent。實驗性的音訊直入引擎也記在那裡，它需要另建一個虛擬環境，並再下載 38.8 GB 模型。除非你有 64 GB 的 Mac 並打算試用，否則可以先不安裝。"
+       data-en="If you would rather the system started by itself, the README describes a LaunchAgent. It also covers the experimental audio-in engine, which needs a second virtualenv and a further 38.8 GB of model. Leave that engine aside unless you have a 64 GB Mac and wish to test it."></p>
   </section>
 
   <section class="band">
@@ -331,16 +331,16 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
         <p class="kicker"><b>06</b> / <span data-zh="磁盘空间" data-tw="磁碟空間" data-en="Disk space"></span></p>
         <h2 data-zh="模型存在哪里" data-tw="模型存在哪裡" data-en="Where the models live"></h2>
       </div>
-      <p data-zh="第一次运行会下载约 6.6 GB，存放在用户目录而非项目文件夹，因此删除仓库并不会释放这些空间。在控制台中更换翻译模型时，首次选择也会下载该模型。8B 为 4.3 GB，35B 为 35 GB，音频直入的模型为 36 GB，且都不会替换已有的模型。"
-         data-tw="第一次執行會下載約 6.6 GB，存放在使用者目錄而非專案資料夾，因此刪除倉庫並不會釋放這些空間。在控制台中更換翻譯模型時，首次選擇也會下載該模型。8B 為 4.3 GB，35B 為 35 GB，音訊直入的模型為 36 GB，且都不會替換已有的模型。"
-         data-en="The first run downloads about 6.6 GB into your home directory rather than into the project folder, so deleting the repository reclaims none of it. Switching the translator in the console downloads that model the first time it is selected. The 8B is 4.3 GB, the 35B is 35 GB and the audio-in model is 36 GB, and none of them replaces what is already stored."></p>
+      <p data-zh="第一次运行会下载约 4.3 GB，存放在用户目录而非项目文件夹，因此删除仓库并不会释放这些空间。在控制台中更换翻译模型时，首次选择也会下载该模型。8B 为 4.6 GB，35B 为 37.7 GB，音频直入的模型为 38.8 GB，且都不会替换已有的模型。"
+         data-tw="第一次執行會下載約 4.3 GB，存放在使用者目錄而非專案資料夾，因此刪除倉庫並不會釋放這些空間。在控制台中更換翻譯模型時，首次選擇也會下載該模型。8B 為 4.6 GB，35B 為 37.7 GB，音訊直入的模型為 38.8 GB，且都不會替換已有的模型。"
+         data-en="The first run downloads about 4.3 GB into your home directory rather than into the project folder, so deleting the repository reclaims none of it. Switching the translator in the console downloads that model the first time it is selected. The 8B is 4.6 GB, the 35B is 37.7 GB and the audio-in model is 38.8 GB, and none of them replaces what is already stored."></p>
     </div>
 
     <table class="spec">
       <tr><td>~/.cache/huggingface/hub</td>
-          <td data-zh="识别、翻译、语音三个模型，约 6.6 GB，以及你另行选用的翻译模型"
-              data-tw="辨識、翻譯、語音三個模型，約 6.6 GB，以及你另行選用的翻譯模型"
-              data-en="The recognition, translation and voice models, about 6.6 GB, plus any translator you have selected"></td></tr>
+          <td data-zh="识别、翻译、语音三个模型，约 4.3 GB，以及你另行选用的翻译模型或语音引擎"
+              data-tw="辨識、翻譯、語音三個模型，約 4.3 GB，以及你另行選用的翻譯模型或語音引擎"
+              data-en="The recognition, translation and voice models, about 4.3 GB, plus any translator or voice engine you have selected"></td></tr>
       <tr><td>~/.cache/torch/hub</td>
           <td data-zh="Silero 语音活动检测，数 MB"
               data-tw="Silero 語音活動偵測，數 MB"
@@ -356,12 +356,13 @@ pip install speech-to-speech 'misaki[zh]' segno</code></pre>
 hf cache ls                    <span class="c"># what is cached, and how big</span>
 
 hf cache rm model/mlx-community/Qwen3-4B-Instruct-2507-4bit \
-            model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/Kokoro-82M-bf16 \
             model/mlx-community/whisper-large-v3-turbo
 
-<span class="c"># only if you switched the translator, or ran the audio-in engine;
+<span class="c"># only if you switched the translator or voice engine, or ran the audio-in engine;
 # hf cache ls above shows which of these you actually have</span>
-hf cache rm model/mlx-community/Qwen3-8B-4bit \
+hf cache rm model/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit \
+            model/mlx-community/Qwen3-8B-4bit \
             model/mlx-community/Qwen3.6-35B-A3B-8bit \
             model/mlx-community/Qwen3-Omni-30B-A3B-Instruct-8bit
 
