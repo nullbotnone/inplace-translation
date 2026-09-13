@@ -18,13 +18,20 @@ translates between English and Chinese, so the detector only ever gets to answer
 "zh": the most likely of those two, whatever the other 97 scored. Nothing to restart or
 reconfigure when it is wrong about Japanese -- Japanese is not on the ballot.
 
+Third patch, for what Whisper hears in a room that is not talking: handed a cough, an organ
+chord or the PA's hum, it does not return nothing -- it loops one word for the length of the
+clip ("wires, wires, wires, wires, ..."), and that gets translated and spoken over the
+sermon. Whisper's own tell for this is how well the text compresses, and the pipeline throws
+the transcription away before the translator ever sees it.
+
 # ponytail: patching dicts and a method in someone else's modules. If upstream lets the
 # target language reach the TTS handler (a --kokoro_follow_output flag, say) and takes a
 # candidate list for detection (--languages en,zh), delete this file and go back to calling
 # `speech-to-speech` directly from bridge.py.
 """
-import sys
+import sys, zlib
 
+from speech_to_speech.STT.base_stt_handler import BaseSTTHandler
 from speech_to_speech.TTS import kokoro_handler
 from speech_to_speech.cli import main
 from mlx_audio.stt.models.whisper import whisper as mlx_whisper
@@ -60,6 +67,38 @@ def _detect_language(self, mel, language=None):
 
 
 mlx_whisper.Model._detect_language = _detect_language
+
+# How much better than its own bytes a transcription has to compress before it is a loop
+# rather than a sentence. Whisper's own number, used inside its decoder for the same
+# judgement. Measured on sermon lines: English prose 1.1, a Chinese verse 1.1, "Amen, amen,
+# amen" 1.0 -- and 5.4 for the wires, 7.8 for a 谢谢观看 loop. Nothing real comes close.
+LOOP_RATIO = 2.4
+
+
+def looping(text):
+    """True for the one word Whisper repeats to fill a clip that had no speech in it."""
+    raw = text.strip().encode()
+    return bool(raw) and len(raw) / len(zlib.compress(raw)) >= LOOP_RATIO
+
+
+_should_emit_output = BaseSTTHandler.should_emit_output
+
+
+def should_emit_output(self, output):
+    """Drop a looping transcription where the pipeline already drops stale ones.
+
+    On the base class, so it covers whichever recogniser is configured. Dropping it here is
+    what keeps it out of the translator, off the subtitles and out of the voice; the turn is
+    still marked finished, or the next partial for it would be recognised all over again.
+    """
+    if looping(getattr(output, "text", "")):
+        print(f"!! dropped a looping transcription: {output.text.strip()[:60]!r}", flush=True)
+        self.before_emit_output(output)
+        return False
+    return _should_emit_output(self, output)
+
+
+BaseSTTHandler.should_emit_output = should_emit_output
 
 if __name__ == "__main__":
     sys.exit(main())

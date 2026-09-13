@@ -141,7 +141,10 @@ sessions:
   automatically** only if the preacher genuinely switches mid-sermon — naming the language
   outright gets better recognition on names and short phrases. Detection is limited to these
   two languages, so Mandarin that the recogniser would otherwise have called Japanese still
-  comes through as Chinese.
+  comes through as Chinese. Room noise between sentences is thrown away rather than
+  translated: handed a cough or the PA's hum, the recogniser returns one word looped to fill
+  the clip ("wires, wires, wires, ..."), and the bridge drops it with `!! dropped a looping
+  transcription` rather than speaking it over the sermon.
   There is no 简体/繁體 choice, because listeners are hearing audio and the distinction only
   exists in writing. It shows up in the subtitles, so a congregation that reads Traditional
   asks for it in the glossary: *Write all Chinese in Traditional characters (繁體).*
