@@ -416,7 +416,9 @@ class Pipeline:
             # The translator model is not loaded in this mode -- the audio model is doing
             # that job -- so naming its download size here would just be wrong.
             return "loading the voice"
-        size = "37.7 GB" if "35B" in self.cfg["model"] else "4.3 GB"
+        # Whisper and the 4B translator, which is all the default stack downloads now that
+        # the default voice is a 60 MB file outside the Hugging Face cache.
+        size = "37.7 GB" if "35B" in self.cfg["model"] else "4 GB"
         return f"loading models (first run downloads ~{size})"
 
     def _start_omni(self):

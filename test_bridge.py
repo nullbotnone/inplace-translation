@@ -282,7 +282,7 @@ assert "37.7 GB" not in msg._loading_message(), "omni announced the translator's
 msg.cfg = {**msg.cfg, "engine": "cascade"}
 assert "37.7 GB" in msg._loading_message(), "the cascade still has to warn about the download"
 msg.cfg = {**msg.cfg, "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit"}
-assert "4.3 GB" in msg._loading_message()
+assert "4 GB" in msg._loading_message(), "the default stack still has to warn about its own"
 
 # no history in omni mode. Given previous turns the model answers the chat instead of
 # translating it -- "Assistant:" prefixes, and by the fourth turn it read the book list aloud
