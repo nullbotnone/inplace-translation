@@ -528,9 +528,9 @@ here = Path(__file__).parent
 # The child writes config.json in its own directory. Hold whatever the operator had saved
 # there and put it back afterwards, so running the self-check never costs them their setup.
 saved_config = (here / "config.json").read_bytes() if (here / "config.json").exists() else None
-# The test process has permission to bind the app's normal local HTTP port. The child does
-# not start the translation pipeline, so it leaves the operator's model state untouched.
-proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start"],
+# The child does not start the translation pipeline, so it leaves the operator's model state
+# untouched. An ephemeral port keeps it separate from a live console the operator may be using.
+proc = subprocess.Popen([sys.executable, str(here / "bridge.py"), "--no-start", "--port", "0"],
                         cwd=here, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         start_new_session=True)
 try:
@@ -572,7 +572,13 @@ for name in ("speech_to_speech", "speech_to_speech.TTS", "speech_to_speech.TTS.k
     parent, _, leaf = name.rpartition(".")
     if parent:
         setattr(sys.modules[parent], leaf, sys.modules[name])
+class FakeKokoro:
+    def _process_mlx(self, text, language_code=None):
+        self.seen = (self.voice, self.lang_code, language_code)
+        yield "audio"
+
 sys.modules["speech_to_speech.TTS.kokoro_handler"].WHISPER_LANGUAGE_TO_KOKORO_LANG = {"en": "a"}
+sys.modules["speech_to_speech.TTS.kokoro_handler"].KokoroTTSHandler = FakeKokoro
 sys.modules["speech_to_speech.cli"].main = lambda: 0
 whisper_mod = sys.modules["mlx_audio.stt.models.whisper.whisper"]
 whisper_mod.Model = type("Model", (), {})
@@ -584,6 +590,17 @@ import run_pipeline
 
 assert not sys.modules["speech_to_speech.TTS.kokoro_handler"].WHISPER_LANGUAGE_TO_KOKORO_LANG, \
     "the voice would follow the language the mic heard, not the one it is speaking"
+
+# The selected target voice is also authoritative when synthesis begins. The handler receives
+# the microphone language here and may have taken an unrelated response voice, neither of which
+# is allowed to turn an English translation into Chinese speech.
+fixed = FakeKokoro()
+fixed.voice, fixed.lang_code = "zm_yunyang", "z"
+fixed._initial_voice, fixed._initial_lang_code = "am_michael", "a"
+fixed.model = type("Model", (), {"_get_pipeline": lambda self, lang: type(
+    "Pipeline", (), {"load_voice": lambda self, voice: (lang, voice)})()})()
+assert list(fixed._process_mlx("God loves the world.", "zh")) == ["audio"]
+assert fixed.seen == ("am_michael", "a", None), f"Kokoro followed input language: {fixed.seen}"
 assert whisper_mod.Model._detect_language is run_pipeline._detect_language, \
     "whisper still picks from all 99 languages"
 assert run_pipeline.pick({"ja": .80, "zh": .15, "en": .05}) == "zh", "Japanese won the vote"

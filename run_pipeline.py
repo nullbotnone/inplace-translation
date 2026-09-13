@@ -38,6 +38,26 @@ from mlx_audio.stt.models.whisper import whisper as mlx_whisper
 
 kokoro_handler.WHISPER_LANGUAGE_TO_KOKORO_LANG.clear()
 
+# The handler receives the *input* language with every TTS chunk. On an English output from a
+# Chinese sermon that is "zh", which is a fact about the microphone and not about the text now
+# being synthesised. It also accepts an OpenAI-style response voice, which is unrelated to the
+# Kokoro voice selected in the console. Both can replace the configured American phonemiser and
+# voice after startup. Keep the loaded target-language pair authoritative at the final point
+# before MLX generates audio.
+_process_mlx = kokoro_handler.KokoroTTSHandler._process_mlx
+
+
+def _process_mlx_in_configured_language(self, text, language_code=None):
+    voice, lang = self._initial_voice, self._initial_lang_code
+    if self.voice != voice or self.lang_code != lang:
+        self.voice, self.lang_code = voice, lang
+        self._pipeline = self.model._get_pipeline(lang)
+        self._voice_tensor = self._pipeline.load_voice(voice)
+    yield from _process_mlx(self, text, language_code=None)
+
+
+kokoro_handler.KokoroTTSHandler._process_mlx = _process_mlx_in_configured_language
+
 # The only two languages this service recognises, translates, or speaks. bridge.py's SPOKEN
 # and TARGETS are the same two: a language listeners cannot be sent to is no use heard.
 LANGUAGES = ("en", "zh")

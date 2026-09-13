@@ -1034,10 +1034,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    global HTTP_PORT
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--no-start", action="store_true",
                     help="serve the console but wait for it to start the pipeline")
+    ap.add_argument("--port", type=int, default=HTTP_PORT,
+                    help="HTTP port to listen on (default: %(default)s)")
     args = ap.parse_args()
+    HTTP_PORT = args.port
 
     ff = subprocess.Popen(
         ["ffmpeg", "-loglevel", "error", "-f", "s16le", "-ar", str(RATE), "-ac", "1",
@@ -1057,6 +1061,7 @@ def main():
         signal.signal(sig, lambda *_: sys.exit(0))
 
     server = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
+    HTTP_PORT = server.server_port
     url = pipeline.status()["url"]
     print(f"\n  Listeners: {url}\n  Console:   http://localhost:{HTTP_PORT}/admin\n")
     with contextlib.suppress(ImportError):
