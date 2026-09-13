@@ -279,8 +279,18 @@ All of this lives in the console; the notes below are why each one is there.
 
   Listeners' phones add a delay of their own — a browser buffers a second or two while it
   joins the stream, and since the stream never stops, nothing makes it up again. The listener
-  page watches that gap and plays 6% fast until it closes, which is why the voice now tracks
-  the subtitle of the same sentence instead of trailing it for the rest of the service.
+  page watches that gap and plays 6% fast until it closes.
+
+  The translation is written far faster than it can be spoken — a sentence that takes five
+  seconds to say is generated in a fraction of one — so a subtitle published the moment it
+  existed runs seconds ahead of the voice reading it. Each line is therefore booked against
+  the position in the audio stream where its own sentence begins, and published when the
+  voice reaches it: measured against a live pipeline, that is between 3 and 11 seconds
+  earlier in the stream than the moment the text arrived. Nothing queued means nothing to
+  wait for, so the first sentence after a pause is not held back at all.
+
+  The phone then holds each line by however far its own playback is behind the live edge,
+  which is the part only the phone can know. With audio off, the text appears as it arrives.
 
 ## What this is not
 

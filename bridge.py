@@ -293,10 +293,50 @@ class Fanout:
 
 
 out_q = queue.Queue()             # translated PCM, chunked
+# Where the voice has got to, counted in bytes of translated audio since the bridge started.
+# A subtitle is booked against a position in that stream and published when the pacer passes
+# it, which is what keeps a sentence's text with the sentence being spoken rather than with
+# the translator, who is several sentences ahead.
+audio_lock = threading.Lock()
+queued_bytes = 0                  # handed to the pacer
+played_bytes = 0                  # handed on to the encoder, at wall-clock rate
+booked = []                       # [(at_byte, kind, text)] waiting for the voice to reach it
 audio = Fanout(MAX_QUEUED)        # mp3 chunks
 subs = Fanout(20)                 # subtitle lines
 events = Fanout(50)               # operator console updates
 recent = []                       # last few lines, so a phone joining mid-sermon sees context
+
+
+def queue_audio(chunk):
+    """Queue translated audio and return the stream position of its first byte."""
+    global queued_bytes
+    with audio_lock:
+        at = queued_bytes
+        queued_bytes += len(chunk)
+    out_q.put(chunk)
+    return at
+
+
+def say_at(position, kind, text):
+    """Publish a subtitle when the voice reaches this position, or now if it is already past.
+
+    Nothing queued means position == played_bytes, so the first sentence after a pause is
+    not held back at all -- the wait is only ever as long as the speech in front of it.
+    """
+    with audio_lock:
+        if position > played_bytes:
+            booked.append((position, kind, text))
+            return
+    subtitle(kind, text)
+
+
+def flush_booked():
+    """Publish what the voice will now never reach: a dropped backlog, or a pipeline that
+    stopped. The audio is what there was too much of; the words still have to arrive."""
+    with audio_lock:
+        stranded, booked[:] = list(booked), []
+    for _, kind, text in stranded:
+        subtitle(kind, text)
 
 
 def port_open(port):
@@ -604,6 +644,10 @@ class Pipeline:
         # The lead is also pure delay, on every turn, so the default is small: Piper is the
         # default voice now and it never waits for the GPU, so there are no gusts to cover.
         held = bytearray()
+        # Where this turn's audio started in the stream, and where the turn whose text has
+        # not arrived yet started. The pipeline sends a turn's transcript after the last of
+        # its audio, so without this the subtitle would be booked a whole sentence late.
+        turn_at = spoken_at = None
         try:
             for msg in self.ws:
                 ev = json.loads(msg)
@@ -614,17 +658,27 @@ class Pipeline:
                     # Read per gust, so an operator who hears chopping can raise the lead
                     # mid-sermon and hear the difference on the next sentence.
                     if len(held) >= self.cfg["lead_ms"] * RATE * 2 // 1000:
-                        out_q.put(bytes(held))
+                        at = queue_audio(bytes(held))
+                        turn_at = at if turn_at is None else turn_at
                         held.clear()
                 elif t.endswith("audio.done") and "transcript" not in t:
                     if held:
-                        out_q.put(bytes(held))
+                        at = queue_audio(bytes(held))
+                        turn_at = at if turn_at is None else turn_at
                         held.clear()
+                    spoken_at, turn_at = turn_at, None
                 elif "input_audio_transcription" in t and t.endswith((".completed", ".done")):
                     subtitle("src", ev.get("transcript", ""))
                 elif t.endswith("audio_transcript.done"):
-                    # text is ready before the audio it narrates, so subtitles run a little ahead
-                    subtitle("out", ev.get("transcript", ""))
+                    # A turn's text arrives after the last of its audio -- measured, not
+                    # assumed: 4.6 s of speech generated in 0.3 s, then audio.done, then this
+                    # 10 ms later. Published here it would run ahead of the voice by
+                    # everything still queued; booked against the end of its own audio it
+                    # would trail by a whole sentence. So book it against where that
+                    # sentence's audio began.
+                    say_at(spoken_at if spoken_at is not None else queued_bytes,
+                           "out", ev.get("transcript", ""))
+                    spoken_at = None
         except Exception as exc:
             if self.state == "running":
                 self._set("error", f"lost the pipeline: {exc}")
@@ -798,6 +852,7 @@ def broadcast_died(why):
 
 def pacer(stdin, stop=None):
     """Feed ffmpeg at wall-clock rate: translated audio when we have it, silence otherwise."""
+    global played_bytes
     # pos walks through buf rather than reslicing it: buf now holds a whole turn, and
     # copying a quarter of a megabyte fifty times a second is not what this thread is for.
     silence, buf, pos = b"\0" * (BLOCK * 2), b"", 0
@@ -814,8 +869,22 @@ def pacer(stdin, stop=None):
             print("!! backlog, dropping audio", flush=True)
             with out_q.mutex:
                 out_q.queue.clear()
+            # Nothing will ever play those bytes, so nothing would ever publish the subtitles
+            # booked against them. Catch the stream position up to what was dropped.
+            with audio_lock:
+                played_bytes = queued_bytes
+            flush_booked()
         if len(buf) - pos >= BLOCK * 2:
             chunk, pos = buf[pos:pos + BLOCK * 2], pos + BLOCK * 2
+            # Only translated audio moves the stream position; the silence between sentences
+            # is not something a subtitle can be booked against.
+            with audio_lock:
+                played_bytes += len(chunk)
+                due = [b for b in booked if b[0] <= played_bytes]
+                if due:
+                    booked[:] = [b for b in booked if b[0] > played_bytes]
+            for _, kind, text in due:
+                subtitle(kind, text)
         else:
             chunk = silence
         try:

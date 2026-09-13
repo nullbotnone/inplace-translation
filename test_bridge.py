@@ -26,13 +26,16 @@ def run_pacer(seconds=0.3):
 
 
 # a turn's audio is held until the TTS says it is done, then queued as one piece: played
-# gust by gust, the stalls where the LLM has the GPU land as silence inside words
+# gust by gust, the stalls where the LLM has the GPU land as silence inside words.
+# The event order here is the pipeline's own, traced against it: a turn's audio, then
+# audio.done, then the transcript of what was just spoken.
+bridge.recent.clear()
 p_ws = bridge.Pipeline()
 p_ws.ws = [json.dumps(e) for e in (
     {"type": "response.output_audio.delta", "delta": b64(b"\1\2")},
-    {"type": "response.output_audio_transcript.done", "transcript": "hi"},
     {"type": "response.output_audio.delta", "delta": b64(b"\3\4")},
     {"type": "response.output_audio.done"},
+    {"type": "response.output_audio_transcript.done", "transcript": "hi"},
     {"type": "response.output_audio.delta", "delta": b64(b"\5\6")},
 )]
 p_ws._read_ws()
@@ -65,11 +68,42 @@ assert set(b"".join(w)) == {0}, "expected silence while idle"
 bridge.out_q.put(bytes(range(256)) * 5)          # 1280 B = 2 blocks
 assert b"".join(run_pacer(0.1)).startswith(bytes(range(256)) * 5), "queued audio not emitted first"
 
+# a subtitle is booked against the position in the audio stream where its own sentence
+# begins, and published when the voice gets there -- not when the translator, which is
+# several sentences ahead of the voice, happened to write it
+bridge.recent.clear()
+# the tests above drained the queue by hand rather than playing it, so start the voice level
+# with what has been queued, the way a dropped backlog does
+bridge.played_bytes = bridge.queued_bytes
+half_second = b"\2" * (bridge.RATE // 2 * 2)
+first = bridge.queue_audio(half_second)          # a sentence already being spoken
+second = bridge.queue_audio(half_second)         # the one whose subtitle we are testing
+bridge.say_at(second, "out", "神爱世人")
+run_pacer(0.2)
+assert not bridge.recent, "the subtitle jumped the sentence being spoken in front of it"
+run_pacer(0.45)
+assert [l["text"] for l in bridge.recent] == ["神爱世人"], f"never published: {bridge.recent}"
+# ... it is published as its own sentence starts, not when that sentence ends
+assert bridge.out_q.qsize() == 0 and len(bridge.recent) == 1
+# ... and a position the voice has already passed goes out at once, so the first sentence
+# after a pause is not held back at all
+bridge.recent.clear()
+bridge.say_at(first, "out", "第二句")
+assert [l["text"] for l in bridge.recent] == ["第二句"], "an already-spoken position waited"
+bridge.recent.clear()
+
 # backlog past MAX_LAG_S is dropped rather than drifting forever
 for _ in range(int(bridge.MAX_LAG_S * bridge.RATE * 2 / 640) + 10):
     bridge.out_q.put(b"\1" * 640)
+bridge.say_at(bridge.queued_bytes + 1, "out", "被丢弃的语音")
+bridge.recent.clear()
 run_pacer(0.1)
 assert bridge.out_q.qsize() < 10, f"backlog not dropped: {bridge.out_q.qsize()}"
+# the audio is what there was too much of; a phone that only reads still needs the words,
+# and nothing will ever play the position they were booked against
+assert [l["text"] for l in bridge.recent] == ["被丢弃的语音"], \
+    f"the subtitle was dropped with the audio: {bridge.recent}"
+bridge.recent.clear()
 
 # eviction is counted in chunks but meant in seconds, so the two have to stay tied together:
 # shrinking the chunk for latency quietly shrank every listener's buffer by the same factor

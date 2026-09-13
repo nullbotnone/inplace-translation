@@ -142,6 +142,21 @@
     while (log.children.length > 40) log.firstChild.remove();
     log.scrollTop = log.scrollHeight; // every new line returns listeners to the live edge
   };
+  // The bridge publishes a line as its own audio starts down the wire, but this phone is
+  // playing whatever it buffered on the way in -- a second or two behind that. Only the
+  // phone knows how far, so hold the line by exactly its own lag. Same delay for every line,
+  // and never earlier than the one before it, so the order on screen is the order spoken.
+  // With audio off there is nothing to wait for and the text appears as it arrives.
+  const MAX_HOLD_S = 5;
+  let showAt = 0;
+  const showWithVoice = (line) => {
+    const held = audio.buffered;
+    const behind = audio.paused || !held || !held.length ? 0
+      : Math.min(held.end(held.length - 1) - audio.currentTime, MAX_HOLD_S);
+    if (behind < 0.25) return addLine(line);
+    showAt = Math.max(Date.now() + behind * 1000, showAt + 50);
+    setTimeout(() => addLine(line), showAt - Date.now());
+  };
   const es = new EventSource("/subs");
   es.onopen = () => connection("live", "Live · 已连接");
   es.onerror = () => connection("offline", "Reconnecting · 重新连接中");
@@ -151,7 +166,7 @@
       if (seenLines.has(signature)) return; // reconnects replay the server's recent backlog
       seenLines.add(signature); seenOrder.push(signature);
       if (seenOrder.length > 80) seenLines.delete(seenOrder.shift());
-      addLine(line);
+      showWithVoice(line);
     } catch (error) { console.error("Bad subtitle event", error); } };
 </script>
 </body>

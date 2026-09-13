@@ -73,6 +73,27 @@ if (ids.b.dataset.mode !== "playing") throw new Error("play button did not show 
 ids.b.onclick();
 if (ids.b.dataset.mode !== "idle" || !ids.a.paused) throw new Error("audio could not be paused");
 
+// A phone playing two seconds behind the live edge must hold the subtitle by the same two
+// seconds, or the text arrives before the voice reading it. With audio off, nothing to wait
+// for. Timers are captured rather than run, so the test does not have to sleep.
+const pending = [];
+sandbox.setTimeout = (fn, ms) => { pending.push([fn, ms]); return 0; };
+ids.a.paused = false;
+ids.a.currentTime = 100;
+ids.a.buffered = { length: 1, end: () => 102 };
+eventSource.onmessage({ data: JSON.stringify({ kind: "out", text: "held for the voice", at: "10:40:00" }) });
+if (!pending.length) throw new Error("a subtitle was shown while the voice was two seconds behind");
+if (pending[0][1] < 1500) throw new Error(`held only ${pending[0][1]}ms for a 2 s lag`);
+const latest = () => ids.log.children.at(-1).children[1].textContent;   // the transcript is capped
+pending[0][0]();
+if (latest() !== "held for the voice") throw new Error("the held subtitle never appeared");
+pending.length = 0;
+ids.a.paused = true;
+eventSource.onmessage({ data: JSON.stringify({ kind: "out", text: "read live", at: "10:40:01" }) });
+if (latest() !== "read live" || pending.length)
+  throw new Error("a subtitle was held back on a phone that is only reading");
+ids.a.paused = false;
+
 // Whatever the phone buffered on the way in never drains by itself: the stream carries
 // silence between sentences, so the playhead keeps its distance from the live edge and the
 // voice lags the subtitle of the same sentence forever. Play slightly fast until it closes.
