@@ -411,6 +411,7 @@ rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
      language and theme carry across slashai.app pages. */
   const LANGS = ["zh", "tw", "en"];
   const HTML_LANG = { zh: "zh-CN", tw: "zh-TW", en: "en" };
+  const TITLE = { zh: "讲道翻译｜slashai.app", tw: "講道翻譯｜slashai.app", en: "Sermon Translation | slashai.app" };
   const store = {
     get(key, fallback) {
       try { const v = localStorage.getItem("slashai." + key); return v === null ? fallback : JSON.parse(v); }
@@ -432,6 +433,7 @@ rm -f ~/.cache/piper-voices/zh_CN-huayan-medium.onnx \
 
   function applyLang() {
     document.documentElement.lang = HTML_LANG[lang];
+    document.title = TITLE[lang];
     document.documentElement.dataset.lang = lang;
     document.querySelectorAll("[data-en]").forEach((el) => {
       el.textContent = el.dataset[lang] || el.dataset.en;

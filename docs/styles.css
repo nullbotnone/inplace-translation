@@ -29,9 +29,7 @@
 html { scroll-behavior: smooth; }
 body {
   margin: 0; min-width: 320px; color: var(--ink);
-  background: linear-gradient(90deg, transparent 49.93%,
-              color-mix(in srgb, var(--line) 36%, transparent) 50%, transparent 50.07%), var(--bg);
-  background-size: min(100%, 88rem) 100%; background-position: center;
+  background: var(--bg);
   font: 16px/1.65 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
         "PingFang SC", "Noto Sans SC", sans-serif;
   -webkit-font-smoothing: antialiased;
