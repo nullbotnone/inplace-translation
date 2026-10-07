@@ -186,6 +186,39 @@ sessions:
 The console binds to localhost only, so nobody on the church wifi can stop your broadcast from
 their phone. Use the Mac itself.
 
+### Captions over the slides
+
+`/captions` shows only the newest translation, in large white type on black, as soon as it
+arrives (the room hears the preacher live, so it does not wait for the translated voice). It
+clears after 20 seconds of silence. It starts empty, and stays empty after a reconnect, until
+the next sentence: earlier lines are never replayed onto the slides. Tick **Show original** to put the sentence it translates
+above it in smaller grey type; the browser remembers the choice. **Float captions** opens it in a Document
+Picture-in-Picture window, which stays above everything, a fullscreen PowerPoint slideshow
+included, on macOS and Windows. It opens as a strip 80% of the width of the screen it starts on, the widest Chrome allows,
+and every time at that size rather than wherever it was last dragged to. Drag it onto the
+projector screen and widen it there if needed;
+the text keeps one steady size, set by the window's height (two lines of translation, plus the
+original's line when shown). Only a sentence too long to fit at that size shrinks, rather than
+losing its beginning.
+
+1. In **Chrome or Edge** on the presentation computer, open the caption page *before* starting
+   the slideshow:
+   - on this Mac: skip the page and click **Pop out captions** under *Projector captions* in the console's
+     Listeners card, which floats the captions straight away (its **Show original** box
+     applies to them too). That window closes with the console tab, so leave the console open.
+     The card also shows the caption address for another computer.
+   - on another computer: **http://&lt;this Mac's address&gt;:8000/captions**, the same address
+     as the listener QR code. The browser only allows floating windows on a secure origin, and a
+     plain local address is not one, so do this once per browser: open
+     `chrome://flags/#unsafely-treat-insecure-origin-as-secure` (`edge://flags/...` in Edge),
+     add `http://<this Mac's address>:8000`, set it to **Enabled**, and relaunch.
+2. Click **Float captions** and drag the strip to the bottom of the projector screen.
+3. Start the slideshow. The window stays on top. Closing it puts the captions back in the tab.
+
+The Mac's address must not change between Sundays for the flag to keep working; reserve it in
+the router if it does. The floating window is opaque and has a thin title bar; that is the
+browser's, not this page's. Firefox and Safari do not support it.
+
 Settings are stored in `config.json` next to the script. You can edit that file instead if you
 prefer; the console just writes the same file.
 

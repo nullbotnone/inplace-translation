@@ -146,6 +146,14 @@
   .url{display:block;margin:.7rem 0 0;text-align:center;font:.82rem/1.5 var(--mono);
        overflow-wrap:anywhere;color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
   .share-actions{justify-content:center;margin-top:.7rem}
+  .captions{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
+  .captions h2{margin-bottom:.75rem}
+  .cap-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+  .capsrc{display:inline-flex;gap:.45rem;align-items:center;margin:0;font-size:.84rem;cursor:pointer}
+  .capsrc span{margin:0;font-size:inherit;color:inherit}
+  .capsrc input{width:1rem;height:1rem;margin:0;accent-color:var(--accent)}
+  .captions .hint{margin-top:.65rem}
+  .capaddr{display:block;margin-top:.2rem;font:.78rem/1.5 var(--mono);color:var(--accent);overflow-wrap:anywhere}
   .count{font:650 .72rem/1.4 var(--mono);color:var(--dim);white-space:nowrap}
   .count.warn{color:var(--warn)}
 
@@ -355,6 +363,22 @@
     <div class="stat">
       <b data-zh="当前连接" data-tw="目前連線" data-en="Connected now"></b>
       <span id="listeners">0</span>
+    </div>
+    <div class="captions">
+      <h2 data-zh="投影字幕" data-tw="投影字幕" data-en="Projector captions"></h2>
+      <div class="cap-row">
+        <button id="floatcaps" type="button" data-zh="弹出字幕窗口" data-tw="彈出字幕視窗"
+                data-en="Pop out captions"></button>
+        <label class="capsrc"><input type="checkbox" id="capsrc"><span data-zh="显示原文"
+               data-tw="顯示原文" data-en="Show original"></span></label>
+      </div>
+      <p class="hint" data-zh="置顶显示在全屏幻灯片上方。请保持此控制台打开。"
+         data-tw="置頂顯示在全螢幕投影片上方。請保持此控制台開啟。"
+         data-en="Stays on top of a fullscreen slideshow on this Mac. Keep this console open."></p>
+      <p class="hint" data-zh="在另一台电脑上，用 Chrome 或 Edge 打开："
+         data-tw="在另一台電腦上，用 Chrome 或 Edge 開啟："
+         data-en="On another computer, open in Chrome or Edge:"></p>
+      <span class="capaddr" id="capaddr"></span>
     </div>
   </section>
 
@@ -609,6 +633,7 @@ function paint() {
   $("listenersbrief").textContent = s.listeners;
   $("url").textContent = s.url;
   $("url").href = s.url || "";
+  $("capaddr").textContent = s.url ? `${s.url}captions` : "";   // for the slideshow computer
   if (s.url && s.url !== qrUrl) {
     qrUrl = s.url;
     fetch("/qr.svg").then((r) => (r.ok ? r.text() : "")).then((svg) => {
@@ -698,6 +723,26 @@ $("savegloss").onclick = async () => {
   }
 };
 
+// The caption page reads the same key and listens for changes, so this also flips a window
+// that is already floating.
+try { $("capsrc").checked = localStorage.getItem("showsrc") === "1"; } catch (_) {}
+$("capsrc").onchange = () => {
+  try { localStorage.setItem("showsrc", $("capsrc").checked ? "1" : ""); } catch (_) {}
+};
+// The floating window belongs to this tab: it closes if the console is closed or reloaded.
+$("floatcaps").onclick = async () => {
+  const url = new URL("/captions", location).href;
+  if (!("documentPictureInPicture" in window)) return window.open(url, "_blank");
+  // As wide as Chrome allows, which is 80% of the screen it opens on: a strip across the
+  // slides. preferInitialWindowPlacement stops Chrome reusing whatever size the window was
+  // last dragged to, which otherwise wins over the size asked for here.
+  const pip = await documentPictureInPicture.requestWindow({
+    width: screen.availWidth, height: 180, preferInitialWindowPlacement: true });
+  const frame = pip.document.createElement("iframe");
+  frame.src = url;
+  frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0";
+  pip.document.body.append(frame);
+};
 $("copyurl").onclick = async () => {
   if (!current?.url) return;
   try {

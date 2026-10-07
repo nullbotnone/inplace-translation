@@ -110,6 +110,11 @@ assert not looked_up - keys["en"], f"console looks up undefined strings {sorted(
 listener = (WEB / "index.html").read_text()
 balanced(listener, "index.html")
 
+# ---- the projector caption page
+captions = (WEB / "captions.html").read_text()
+balanced(captions, "captions.html")
+ids_resolve(captions, "captions.html")
+
 # ---- the public landing page
 page = (ROOT / "docs" / "index.html").read_text()
 css = (ROOT / "docs" / "styles.css").read_text()

@@ -827,9 +827,17 @@ class Pipeline:
                     # would trail by a whole sentence. So book it against where that
                     # sentence's audio began.
                     at = spoken_at if spoken_at is not None else queued_bytes
+                    text = ev.get("transcript", "")
+                    reply_to = spoken_heard if spoken_heard is not None else heard_id
+                    # ... except on the projector. The room hears the preacher, not this
+                    # voice, so its captions take the text now under a named event that the
+                    # phones, which listen only for unnamed lines, never see.
+                    if text.strip():
+                        subs.publish(f"event: caption\ndata: "
+                                     f"{json.dumps({'text': text, 'reply_to': reply_to})}\n\n"
+                                     .encode())
                     say_at(at + DELIVERY_LAG_MS * RATE * 2 // 1000, "out",
-                           ev.get("transcript", ""), spoken_len / (RATE * 2),
-                           spoken_heard if spoken_heard is not None else heard_id)
+                           text, spoken_len / (RATE * 2), reply_to)
                     spoken_at, spoken_len, spoken_heard = None, 0, None
         except Exception as exc:
             if self.state == "running":
@@ -1269,7 +1277,13 @@ class Handler(BaseHTTPRequestHandler):
             backlog = [f"data: {json.dumps({k: (0 if k == 'secs' else v)
                                               for k, v in l.items() if k != 'voice_at'})}\n\n".encode()
                        for l in list(recent)]
+            # The projector shows only what is being said now, not what was, even briefly.
+            if query.get("live"):
+                backlog = []
             self.stream_subtitles(client, backlog)
+        elif path == "/captions":
+            # Not localhost-only: the slideshow often runs on another computer in the room.
+            self.send_file("captions.html", "text/html; charset=utf-8")
         elif path == "/admin":
             if self.local_only():
                 self.send_file("admin.html", "text/html; charset=utf-8")

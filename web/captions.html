@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Captions / 字幕</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;color-scheme:dark}
+  /* fit() sets the size from the window, so resizing the floating window is the font-size control */
+  #cap{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;
+       padding:3vh 3vw;overflow:hidden;text-align:center;text-wrap:balance;overflow-wrap:anywhere;
+       font:700 min(22vh,6vw)/1.2 system-ui,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+       text-shadow:0 2px 6px #000}
+  #src{font-size:.5em;font-weight:500;color:#bbb}
+  #bar{position:fixed;z-index:1;top:1rem;left:1rem;right:1rem;display:flex;gap:1rem;align-items:center;
+       font:15px/1.4 system-ui,sans-serif;color:#aaa}
+  #bar[hidden]{display:none}
+  #float{padding:.6rem 1.2rem;border:0;border-radius:999px;background:#9fb8d4;color:#08151c;
+         font:700 1rem system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+  #float:disabled{opacity:.4;cursor:default}
+  label{display:flex;gap:.4rem;align-items:center;white-space:nowrap;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="float">Float captions · 悬浮字幕</button>
+  <label><input type="checkbox" id="showsrc"> Show original · 显示原文</label>
+  <span id="hint">Opens an always-on-top window you can drag over the slideshow. · 打开置顶窗口，拖到幻灯片上。</span>
+</div>
+<div id="cap"><div id="src"></div><div id="out"></div></div>
+<script>
+  const $ = (id) => document.getElementById(id), cap = $("cap");
+  // Held, not looked up: floating moves them into the floating window's own document.
+  const src = $("src"), out = $("out");
+  // Remembered per browser, so the projector computer keeps its choice between Sundays.
+  try { $("showsrc").checked = localStorage.getItem("showsrc") === "1"; } catch {}
+  $("showsrc").onchange = () => {
+    try { localStorage.setItem("showsrc", $("showsrc").checked ? "1" : ""); } catch {}
+    if (!$("showsrc").checked) src.textContent = "";
+    fit();
+  };
+  // Set from the console, which floats this page in a frame with no controls of its own.
+  addEventListener("storage", (event) => {
+    if (event.key !== "showsrc") return;
+    $("showsrc").checked = event.newValue === "1";
+    if (!$("showsrc").checked) src.textContent = "";
+    fit();
+  });
+  if (window.top !== window) $("bar").hidden = true;
+  // The room hears the preacher live, so each translation shows the moment it arrives,
+  // not when the translated voice reaches it, and is cleared once the preacher stops.
+  const CLEAR_AFTER_MS = 20000;
+  let clearTimer;
+  // The original is shown with its own translation, not as it is heard: by the time a
+  // translation arrives the preacher is a sentence further on, and reply_to says which
+  // heard line it answers.
+  const heard = new Map();
+  // One steady size, set by the window: two lines of translation (1.2 line-height each), plus
+  // one line of original at half size when it is shown. Only a caption that would not fit at
+  // that size shrinks, rather than losing its beginning off the top. Heights are summed from
+  // the children: overflow above a centred flex box never shows up in scrollHeight.
+  const fit = () => {
+    const room = cap.clientHeight - parseFloat(getComputedStyle(cap).paddingTop) * 2;
+    let lo = 10, hi = room / ($("showsrc").checked ? 3 : 2.4);
+    while (hi - lo > 0.5) {
+      const size = (lo + hi) / 2;
+      cap.style.fontSize = `${size}px`;
+      if (src.offsetHeight + out.offsetHeight <= room) lo = size; else hi = size;
+    }
+    cap.style.fontSize = `${lo}px`;
+  };
+  addEventListener("resize", fit);
+  const es = new EventSource("/subs?live=1");
+  // What was heard comes as ordinary lines. The translations in those lines wait for the
+  // voice to reach them, for the phones; the bridge also sends each one as a "caption" event
+  // the moment its text exists, and those are what the projector shows.
+  es.onmessage = (event) => { try {
+    const line = JSON.parse(event.data);
+    if (line.kind !== "src") return;
+    heard.delete(line.id); heard.set(line.id, line.text);     // a re-transcription updates it
+    if (heard.size > 20) heard.delete(heard.keys().next().value);
+  } catch (error) { console.error("Bad subtitle event", error); } };
+  es.addEventListener("caption", (event) => { try {
+    const line = JSON.parse(event.data);
+    src.textContent = $("showsrc").checked ? heard.get(line.reply_to) ?? "" : "";
+    out.textContent = line.text;
+    fit();
+    clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => { src.textContent = out.textContent = ""; },
+                            CLEAR_AFTER_MS);
+  } catch (error) { console.error("Bad caption event", error); } });
+
+  // Document Picture-in-Picture: a window that stays above everything, a fullscreen
+  // slideshow included, on macOS and Windows. Chrome and Edge only, and only on a secure
+  // origin -- localhost, or an address allowed in chrome://flags (see the technical guide).
+  if (!("documentPictureInPicture" in window)) {
+    $("float").disabled = true;
+    $("hint").textContent = window.isSecureContext
+      ? "Floating needs Chrome or Edge. · 悬浮字幕需要 Chrome 或 Edge 浏览器。"
+      : "Floating needs localhost or a chrome://flags exception; see the technical guide. · 需在 chrome://flags 中允许此地址，见技术指南。";
+  }
+  $("float").onclick = async () => {
+    // As wide as Chrome allows, which is 80% of the screen it opens on: a strip across the
+    // slides. preferInitialWindowPlacement stops Chrome reusing whatever size the window was
+    // last dragged to, which otherwise wins over the size asked for here.
+    const pip = await documentPictureInPicture.requestWindow({
+      width: screen.availWidth, height: 180, preferInitialWindowPlacement: true });
+    pip.document.head.append(document.querySelector("style").cloneNode(true));
+    pip.document.body.append(cap);
+    $("bar").hidden = true;
+    fit();   // the size set for the tab would overflow a 180px strip until the next line
+    pip.addEventListener("resize", fit);
+    pip.addEventListener("pagehide", () => {
+      document.body.append(cap); $("bar").hidden = false; fit();
+    });
+  };
+</script>
+</body>
+</html>

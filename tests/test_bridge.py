@@ -908,4 +908,43 @@ assert handler.should_emit_output(Output("Amen.")) is True, "real speech was dro
 # of ours rather than left open to any language at all
 assert "English or Chinese" in bridge.base_prompt({**bridge.DEFAULTS, "source": "auto"})
 
+# a phone that joins late gets what was already said; the projector captions get only
+# what is said from now on, or a stale sentence sits over the slides
+from http.server import ThreadingHTTPServer
+bridge.recent[:] = [{"kind": "out", "text": "an old line", "at": "10:00:00", "secs": 1, "id": 1}]
+server = ThreadingHTTPServer(("127.0.0.1", 0), bridge.Handler)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+def first_bytes(path):
+    s = socket.create_connection(("127.0.0.1", server.server_port)); s.settimeout(1)
+    s.sendall(f"GET {path} HTTP/1.1\r\nHost: x\r\n\r\n".encode()); got = b""
+    try:
+        while chunk := s.recv(4096): got += chunk
+    except socket.timeout: pass
+    s.close()
+    return got.decode()
+assert "an old line" in first_bytes("/subs"), "a late phone lost what was already said"
+live = first_bytes("/subs?live=1")
+assert " 200 " in live.split("\r\n")[0] and "an old line" not in live, "the captions replayed history"
+server.shutdown()
+
+# the projector's caption goes out the moment the translation's text exists; the phones' line
+# for the same text still waits for the voice to reach it
+bridge.recent.clear()
+p_cap = bridge.Pipeline()
+p_cap.ws = [json.dumps(e) for e in (
+    {"type": "response.output_audio.delta", "delta": b64(b"\1\2" * 100)},
+    {"type": "response.output_audio.done"},
+    {"type": "response.output_audio_transcript.done", "transcript": "以马内利"},
+)]
+with bridge.subs.subscribe() as q:
+    bridge.played_bytes = bridge.queued_bytes - 1   # the voice has not reached it yet
+    p_cap._read_ws()
+    sent = [q.get_nowait() for _ in range(q.qsize())]
+caption = [m for m in sent if m.startswith(b"event: caption\n")]
+assert len(caption) == 1, f"no projector caption: {sent}"
+assert json.loads(caption[0].split(b"data: ", 1)[1])["text"] == "以马内利"
+assert not [l for l in bridge.recent if l["kind"] == "out"], "the phones' line jumped the voice"
+with bridge.audio_lock:
+    bridge.booked.clear()
+
 print("ok")
