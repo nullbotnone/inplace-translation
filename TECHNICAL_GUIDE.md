@@ -1,8 +1,8 @@
 # In-place Translation: technical and operations guide
 
 For the short installation and Sunday-morning workflow, start with the
-[README](README.md). This guide keeps the implementation notes, tuning advice,
-benchmarks, troubleshooting, unattended operation, model storage, and test details.
+[README](README.md). This guide keeps the implementation notes, projector captions, tuning
+advice, benchmarks, troubleshooting, unattended operation, model storage, and test details.
 
 One laptop listens to the preacher, translates EN↔ZH locally, and broadcasts the
 translated voice as an MP3 stream with live subtitles. Phones join by scanning a QR code —

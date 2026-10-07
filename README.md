@@ -98,8 +98,8 @@ glossary, target language, and voice-buffer changes apply live where possible.
 ## More documentation
 
 - [Technical and operations guide](TECHNICAL_GUIDE.md)—hardware choices, advanced setup,
-  unattended startup, every console setting, tuning, troubleshooting, model cleanup, and
-  implementation details
+  unattended startup, every console setting, projector captions, tuning, troubleshooting,
+  model cleanup, and implementation details
 - [Audio-in engine experiments](experiments/README.md)—measurements and setup notes for
   Qwen3-Omni
 - [Public project page](https://slashai.app/inplace-translation/)—a friendly overview in
