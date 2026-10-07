@@ -156,7 +156,7 @@ h1, h2 { margin: 0; font-family: var(--display); font-weight: 500;
          border-radius: var(--radius); background: var(--surface); }
 .stage svg { display: block; width: 100%; height: auto; }
 
-.features { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.features { display: grid; gap: 1.25rem; grid-template-columns: repeat(3, 1fr); }
 .feature { padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--line);
            border-radius: var(--radius); background: var(--surface);
            transition: transform .25s ease, border-color .25s ease; }
@@ -205,6 +205,7 @@ footer p { margin: 0; }
   .phone { justify-self: start; }
   .band-head { grid-template-columns: 1fr; gap: 1.5rem; }
   .limits li { grid-template-columns: 1fr; gap: .4rem; }
+  .features { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 680px) {
   main, .topbar, footer { width: min(calc(100% - 1.5rem), 82rem); }
@@ -217,6 +218,7 @@ footer p { margin: 0; }
   .hero-actions { align-items: flex-start; flex-direction: column; }
   .phone { width: 100%; }
   footer { grid-template-columns: 1fr; gap: .8rem; padding: 2.5rem 0; }
+  .features { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
