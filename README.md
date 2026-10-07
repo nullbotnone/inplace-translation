@@ -57,6 +57,18 @@ Sentence timing is synchronized; word timing is approximate because the voice en
 do not provide phoneme timestamps. Chinese reveals by character and English by
 approximate syllable timing. With audio paused, translations appear immediately.
 
+## Captions on the projector
+
+The room can read along without a phone. In the console's Listeners card, **Pop out
+captions** opens a strip that stays on top of a fullscreen slideshow and shows only the
+newest translation, with the original above it if you tick **Show original**. The room
+already hears the preacher, so each translation appears as soon as it exists rather than
+waiting for the voice. Drag the strip onto the projector screen and size it there.
+
+It needs Chrome or Edge. A separate presentation computer opens the caption address shown
+under the button and needs a one-time browser setting; the
+[technical guide](TECHNICAL_GUIDE.md#captions-over-the-slides) has the steps.
+
 ## Settings that matter most
 
 - **Microphone:** select the sound-desk input and confirm activity on the meter.
